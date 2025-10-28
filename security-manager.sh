@@ -347,41 +347,42 @@ create_monitor_script() {
 }
 
 create_aliases() {
-    show_progress "7" "7" "Creating shell aliases"
+    show_progress "7" "7" "Creating shell shortcuts"
     
-    local alias_content='# Security monitoring aliases
-alias security-status="sudo /usr/local/bin/security-monitor status"
-alias security-scan="sudo /usr/local/bin/security-monitor scan"
-alias security-health="sudo /usr/local/bin/security-manager health"
+    # Create functions instead of aliases (they work better across shells)
+    local function_content='# Security monitoring shortcuts
+security-status() { sudo /usr/local/bin/security-monitor status "$@"; }
+security-scan() { sudo /usr/local/bin/security-monitor scan "$@"; }
+security-health() { sudo /usr/local/bin/security-manager health "$@"; }
 '
     
-    # System-wide aliases
+    # System-wide functions
     if [ -d /etc/profile.d ]; then
-        echo "$alias_content" > /etc/profile.d/security-monitor.sh
+        echo "$function_content" > /etc/profile.d/security-monitor.sh
         chmod 755 /etc/profile.d/security-monitor.sh
     fi
     
     # Add to user bashrc files
-    add_user_aliases "/root" "$alias_content"
-    add_user_aliases "/home/ec2-user" "$alias_content"
-    add_user_aliases "/home/ubuntu" "$alias_content"
+    add_user_aliases "/root" "$function_content"
+    add_user_aliases "/home/ec2-user" "$function_content"
+    add_user_aliases "/home/ubuntu" "$function_content"
     
-    show_status "success" "Aliases created"
-    log_message "INFO" "Shell aliases created"
+    show_status "success" "Shell shortcuts created"
+    log_message "INFO" "Shell shortcuts created"
 }
 
 add_user_aliases() {
     local user_home="$1"
-    local alias_content="$2"
+    local function_content="$2"
     
     [ ! -d "$user_home" ] && return
     
     local bashrc="$user_home/.bashrc"
     [ ! -f "$bashrc" ] && return
     
-    if ! grep -q "# Security monitoring aliases" "$bashrc" 2>/dev/null; then
+    if ! grep -q "# Security monitoring shortcuts" "$bashrc" 2>/dev/null; then
         echo "" >> "$bashrc"
-        echo "$alias_content" >> "$bashrc"
+        echo "$function_content" >> "$bashrc"
     fi
 }
 
