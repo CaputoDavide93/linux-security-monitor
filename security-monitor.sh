@@ -1,107 +1,175 @@
 #!/bin/bash
 ################################################################################
 # Security Monitor - Scan and Status Dashboard
-# Created by security-manager.sh during installation
+# Version: 2.1.0
+# Description: Automated security scanning with ClamAV and system updates
 ################################################################################
 
-SECURITY_DIR="/var/lib/security-monitor"
-LOG_DIR="/var/log/security-monitor"
-STATUS_FILE="$SECURITY_DIR/status.json"
+set -euo pipefail  # Exit on error, undefined vars, pipe failures
 
-GREEN='\033[0;32m'
-YELLOW='\033[1;33m'
-BLUE='\033[0;34m'
-CYAN='\033[0;36m'
-RED='\033[0;31m'
-NC='\033[0m'
+# ============================================================================
+# CONFIGURATION
+# ============================================================================
+readonly SECURITY_DIR="/var/lib/security-monitor"
+readonly LOG_DIR="/var/log/security-monitor"
+readonly STATUS_FILE="$SECURITY_DIR/status.json"
 
-[ -f /etc/os-release ] && . /etc/os-release && OS=$ID
+# Colors
+readonly GREEN='\033[0;32m'
+readonly YELLOW='\033[1;33m'
+readonly BLUE='\033[0;34m'
+readonly CYAN='\033[0;36m'
+readonly RED='\033[0;31m'
+readonly NC='\033[0m'
+
+# Detect OS
+[ -f /etc/os-release ] && . /etc/os-release && readonly OS="${ID:-unknown}" || readonly OS="unknown"
+
+# Ensure directories exist
 mkdir -p "$SECURITY_DIR" "$LOG_DIR"
 
-# Detect scan mode: quick (default for manual), full (for cron)
-SCAN_MODE="${2:-quick}"
-if [ "$1" = "scan" ]; then
-    if [ "$SCAN_MODE" = "full" ]; then
-        echo -e "${BLUE}Running FULL security scan...${NC}"
+# ============================================================================
+# HELPER FUNCTIONS
+# ============================================================================
+
+log_message() {
+    local level="$1"
+    shift
+    echo "[$(date +'%Y-%m-%d %H:%M:%S')] [$level] $*" >> "$LOG_DIR/monitor.log"
+}
+
+print_status() {
+    local color="$1"
+    local symbol="$2"
+    local message="$3"
+    echo -e "${color}${symbol} ${message}${NC}"
+}
+
+validate_integer() {
+    local value="$1"
+    if [[ "$value" =~ ^[0-9]+$ ]]; then
+        echo "$value"
     else
-        echo -e "${BLUE}Running quick security scan...${NC}"
+        echo "0"
+    fi
+}
+
+# ============================================================================
+# SCAN FUNCTION
+# ============================================================================
+
+run_security_scan() {
+    local scan_mode="${1:-quick}"
+    local timestamp=$(date -Iseconds)
+    
+    log_message "INFO" "Starting $scan_mode scan"
+    
+    if [ "$scan_mode" = "full" ]; then
+        print_status "$BLUE" "●" "Running FULL security scan..."
+    else
+        print_status "$BLUE" "●" "Running quick security scan..."
         echo -e "${CYAN}(For full scan, use: security-monitor scan full)${NC}"
     fi
-    TIMESTAMP=$(date -Iseconds)
     
-    echo -e "${YELLOW}[1/3] Updating virus definitions${NC}"
+    # Step 1: Update virus definitions
+    echo -e "\n${YELLOW}[1/3] Updating virus definitions${NC}"
+    update_virus_definitions
     
-    # Stop freshclam service temporarily to avoid log file conflicts
-    FRESHCLAM_WAS_RUNNING=0
-    if systemctl is-active --quiet clamav-freshclam 2>/dev/null || systemctl is-active --quiet clamav-freshclam.service 2>/dev/null; then
-        FRESHCLAM_WAS_RUNNING=1
+    # Step 2: Apply system updates
+    echo -e "\n${YELLOW}[2/3] Applying system updates${NC}"
+    local updates=$(apply_system_updates)
+    
+    # Step 3: Scan for malware
+    echo -e "\n${YELLOW}[3/3] Scanning for malware${NC}"
+    scan_for_malware "$scan_mode"
+    
+    # Parse results and save status
+    save_scan_results "$timestamp" "$updates"
+    
+    print_status "$GREEN" "✓" "Scan complete!"
+    log_message "INFO" "Scan completed successfully"
+}
+
+update_virus_definitions() {
+    # Stop freshclam service to avoid conflicts
+    local freshclam_was_running=0
+    if systemctl is-active --quiet clamav-freshclam 2>/dev/null; then
+        freshclam_was_running=1
         systemctl stop clamav-freshclam 2>/dev/null || true
-        systemctl stop clamav-freshclam.service 2>/dev/null || true
         sleep 1
     fi
     
     if freshclam --quiet 2>/dev/null; then
-        FRESHCLAM="success"
-        echo -e "${GREEN}✓ Virus definitions updated${NC}"
+        print_status "$GREEN" "✓" "Virus definitions updated"
     else
-        FRESHCLAM="warning"
-        echo -e "${YELLOW}⚠ Freshclam had issues${NC}"
+        print_status "$YELLOW" "⚠" "Freshclam had issues (may be in cooldown)"
     fi
     
-    echo -e "${YELLOW}[2/3] Applying system updates${NC}"
+    # Restart if it was running
+    [ $freshclam_was_running -eq 1 ] && systemctl start clamav-freshclam 2>/dev/null || true
+}
+
+apply_system_updates() {
+    local update_count=0
+    
     case "$OS" in
         ubuntu|debian)
             apt-get update -qq 2>/dev/null
-            UPDATES=$(apt list --upgradable 2>/dev/null | grep -c upgradable || echo "0")
-            UPDATES=$(echo "$UPDATES" | tr -d '\n' | tr -d ' ')
-            if [ -n "$UPDATES" ] && [ "$UPDATES" -gt 0 ] 2>/dev/null; then
-                echo "  Found $UPDATES updates, applying..."
+            update_count=$(apt list --upgradable 2>/dev/null | grep -c upgradable || echo "0")
+            update_count=$(validate_integer "$update_count")
+            
+            if [ "$update_count" -gt 0 ]; then
+                echo "  Found $update_count updates, applying..."
                 DEBIAN_FRONTEND=noninteractive apt-get upgrade -y -qq 2>&1 | grep -E "^(Setting up|Processing)" | tail -5
-                DEBIAN_FRONTEND=noninteractive apt-get autoremove -y -qq 2>&1 | tail -1
-                echo -e "  ${GREEN}✓ Updates applied${NC}"
+                DEBIAN_FRONTEND=noninteractive apt-get autoremove -y -qq 2>/dev/null
+                print_status "$GREEN" "✓" "Updates applied"
             else
-                UPDATES="0"
-                echo -e "  ${GREEN}✓ System up to date${NC}"
+                print_status "$GREEN" "✓" "System up to date"
             fi
             ;;
+            
         amzn)
             dnf check-update -q 2>/dev/null || true
-            UPDATES=$(dnf list updates 2>/dev/null | tail -n +2 | grep -v "^$" | wc -l | tr -d ' ')
-            if [ -n "$UPDATES" ] && [ "$UPDATES" -gt 0 ] 2>/dev/null; then
-                echo "  Found $UPDATES updates, applying..."
+            update_count=$(dnf list updates 2>/dev/null | tail -n +2 | grep -v "^$" | wc -l | tr -d ' ')
+            update_count=$(validate_integer "$update_count")
+            
+            if [ "$update_count" -gt 0 ]; then
+                echo "  Found $update_count updates, applying..."
                 dnf upgrade -y --refresh 2>&1 | grep -E "^(Installing|Upgrading|Complete)" | tail -8
-                dnf autoremove -y 2>&1 | tail -1
-                echo -e "  ${GREEN}✓ Updates applied${NC}"
+                dnf autoremove -y 2>/dev/null
+                print_status "$GREEN" "✓" "Updates applied"
             else
-                UPDATES="0"
-                echo -e "  ${GREEN}✓ System up to date${NC}"
+                print_status "$GREEN" "✓" "System up to date"
             fi
             ;;
+            
         *)
-            UPDATES="0"
-            echo "  Unknown OS"
+            print_status "$YELLOW" "⚠" "Unknown OS, skipping updates"
             ;;
     esac
     
-    echo -e "${YELLOW}[3/3] Scanning for malware${NC}"
-    SCAN_LOG="$LOG_DIR/scan-$(date +%s).log"
+    echo "$update_count"
+}
+
+scan_for_malware() {
+    local scan_mode="$1"
+    local scan_log="$LOG_DIR/scan-$(date +%s).log"
+    local scan_paths
+    local scan_opts=""
     
-    # Choose scan paths based on mode
-    if [ "$SCAN_MODE" = "full" ]; then
+    if [ "$scan_mode" = "full" ]; then
         echo "  Mode: FULL SCAN (all directories, 10-30 minutes)"
-        SCAN_PATHS="/home /root /opt /tmp /var /usr/local"
-        SCAN_OPTS=""
+        scan_paths="/home /root /opt /tmp /var /usr/local"
     else
         echo "  Mode: QUICK SCAN (critical directories, 30-90 seconds)"
-        SCAN_PATHS="/home /root"
-        # Quick mode: skip large files, limit recursion
-        SCAN_OPTS="--max-filesize=50M --max-scansize=100M --max-recursion=5"
+        scan_paths="/home /root"
+        scan_opts="--max-filesize=50M --max-scansize=100M --max-recursion=5"
     fi
     
-    echo "  Scanning: $SCAN_PATHS"
+    echo "  Scanning: $scan_paths"
     echo ""
     
-    # Run optimized scan
+    # Run scan
     clamscan -r -i \
         --exclude-dir="^/sys" \
         --exclude-dir="^/proc" \
@@ -109,37 +177,42 @@ if [ "$1" = "scan" ]; then
         --exclude="\.git" \
         --exclude="node_modules" \
         --exclude="\.cache" \
-        $SCAN_OPTS \
-        $SCAN_PATHS 2>&1 | tee "$SCAN_LOG" || true
+        $scan_opts \
+        $scan_paths 2>&1 | tee "$scan_log" || true
     
     echo ""
-    echo -e "${GREEN}✓ Scan complete!${NC}"
+}
+
+save_scan_results() {
+    local timestamp="$1"
+    local updates="$2"
+    local scan_log=$(ls -t "$LOG_DIR"/scan-*.log 2>/dev/null | head -1)
     
-    # Restart freshclam service if it was running before
-    if [ $FRESHCLAM_WAS_RUNNING -eq 1 ]; then
-        systemctl start clamav-freshclam 2>/dev/null || true
-        systemctl start clamav-freshclam.service 2>/dev/null || true
-    fi
+    local infected=$(grep "Infected files:" "$scan_log" 2>/dev/null | tail -1 | awk '{print $3}' || echo "0")
+    local scanned=$(grep "Scanned files:" "$scan_log" 2>/dev/null | tail -1 | awk '{print $3}' || echo "0")
+    local status="clean"
     
-    INFECTED=$(grep "Infected files:" "$SCAN_LOG" 2>/dev/null | tail -1 | awk '{print $3}' || echo "0")
-    SCANNED=$(grep "Scanned files:" "$SCAN_LOG" 2>/dev/null | tail -1 | awk '{print $3}' || echo "0")
+    [ "$infected" != "0" ] && status="attention"
     
-    jq -n \
-        --arg ts "$TIMESTAMP" \
-        --arg status "$([[ $INFECTED -eq 0 ]] && echo 'clean' || echo 'attention')" \
-        --arg inf "$INFECTED" \
-        --arg scn "$SCANNED" \
-        --arg upd "$UPDATES" \
+    # Save to JSON
+    command -v jq &>/dev/null && jq -n \
+        --arg ts "$timestamp" \
+        --arg status "$status" \
+        --arg inf "$(validate_integer $infected)" \
+        --arg scn "$(validate_integer $scanned)" \
+        --arg upd "$(validate_integer $updates)" \
         '{last_scan: $ts, scan_status: $status, infected_files: $inf, scanned_files: $scn, updates_available: $upd}' > "$STATUS_FILE"
     
-    echo ""
-    echo -e "${GREEN}✓ Scan complete${NC}"
-    echo "  Scanned: $SCANNED files"
-    echo "  Infected: $INFECTED files"
-    echo "  Updates: $UPDATES available"
-    echo ""
-    
-elif [ "$1" = "status" ] || [ -z "$1" ]; then
+    echo "  Scanned: $scanned files"
+    echo "  Infected: $infected files"
+    echo "  Updates: $updates available"
+}
+
+# ============================================================================
+# STATUS DASHBOARD FUNCTION
+# ============================================================================
+
+show_status_dashboard() {
     clear
     echo ""
     echo -e "${BLUE}═══════════════════════════════════════════════════════════${NC}"
@@ -147,310 +220,168 @@ elif [ "$1" = "status" ] || [ -z "$1" ]; then
     echo -e "${BLUE}═══════════════════════════════════════════════════════════${NC}"
     echo ""
     
-    if [ -f "$STATUS_FILE" ] && command -v jq &>/dev/null; then
-        LAST=$(jq -r '.last_scan // "Never"' "$STATUS_FILE")
-        STATUS=$(jq -r '.scan_status // "unknown"' "$STATUS_FILE")
-        INF=$(jq -r '.infected_files // "0"' "$STATUS_FILE")
-        SCN=$(jq -r '.scanned_files // "0"' "$STATUS_FILE")
-        UPD=$(jq -r '.updates_available // "0"' "$STATUS_FILE" | tr -d '\n' | tr -d ' ')
-        
-        # Ensure UPD is a valid integer
-        if ! [[ "$UPD" =~ ^[0-9]+$ ]]; then
-            UPD="0"
-        fi
-        
-        # Calculate time since last scan
-        if [ "$LAST" != "Never" ]; then
-            LAST_TS=$(date -d "$LAST" +%s 2>/dev/null || date -j -f "%Y-%m-%dT%H:%M:%S" "${LAST:0:19}" +%s 2>/dev/null)
-            NOW_TS=$(date +%s)
-            HOURS_AGO=$(( (NOW_TS - LAST_TS) / 3600 ))
-            LAST_DISPLAY="$LAST (${HOURS_AGO}h ago)"
-        else
-            LAST_DISPLAY="Never"
-            HOURS_AGO=999
-        fi
-        
-        # Next scan time (2 AM daily)
-        NEXT_SCAN=$(date -d "tomorrow 02:00" "+%Y-%m-%d %H:%M" 2>/dev/null || date -v+1d -v2H -v0M "+%Y-%m-%d %H:%M" 2>/dev/null)
-        
-        # Compliance: if cron is scheduled, system is compliant
-        COMPLIANCE=100
-        ISSUES=()
-        
-        # Check cron exists
-        if [ ! -f /etc/cron.d/security-monitor ]; then
-            COMPLIANCE=0
-            ISSUES+=("Automated scans not scheduled")
-        fi
-        
-        # Check if infected
-        if [ "$INF" != "0" ]; then
-            COMPLIANCE=50
-            ISSUES+=("$INF infected files detected")
-        fi
-        
-        # Get REAL-TIME update count (all types)
-        case "$OS" in
-            ubuntu|debian)
-                apt-get update -qq 2>/dev/null
-                UPD=$(apt list --upgradable 2>/dev/null | grep -c upgradable || echo "0")
-                ;;
-            amzn)
-                dnf check-update -q 2>/dev/null || true
-                UPD=$(dnf list updates 2>/dev/null | tail -n +2 | grep -v "^$" | wc -l)
-                ;;
-        esac
-        
-        # Compliance color
-        if [ $COMPLIANCE -eq 100 ]; then
-            COMP_COLOR=$GREEN
-            COMP_ICON="✓"
-        elif [ $COMPLIANCE -ge 50 ]; then
-            COMP_COLOR=$YELLOW
-            COMP_ICON="⚠"
-        else
-            COMP_COLOR=$RED
-            COMP_ICON="✗"
-        fi
-        
-        # ══════════════════════════════════════════════════════════
-        # SCAN STATUS CARD
-        # ══════════════════════════════════════════════════════════
-        echo -e "${CYAN}╔════════════════════════════════════════════════════════╗${NC}"
-        echo -e "${CYAN}║${NC} 📊 ${CYAN}SCAN STATUS${NC}                                            ${CYAN}║${NC}"
-        echo -e "${CYAN}╚════════════════════════════════════════════════════════╝${NC}"
-        
-        if [ "$STATUS" = "clean" ]; then
-            echo -e "  Status:          ${GREEN}✓ CLEAN${NC}"
-        else
-            echo -e "  Status:          ${RED}⚠ ATTENTION REQUIRED${NC}"
-        fi
-        
-        echo -e "  Last Scan:       ${YELLOW}$LAST_DISPLAY${NC}"
-        echo -e "  Next Scan:       ${BLUE}$NEXT_SCAN${NC}"
-        echo -e "  Files Scanned:   $SCN"
-        
-        if [ "$INF" = "0" ]; then
-            echo -e "  Infected:        ${GREEN}$INF${NC}"
-        else
-            echo -e "  Infected:        ${RED}$INF ⚠${NC}"
-        fi
-        
-        # Scan freshness indicator
-        if [ $HOURS_AGO -le 1 ]; then
-            echo -e "  Freshness:       ${GREEN}● Recently scanned${NC}"
-        elif [ $HOURS_AGO -le 24 ]; then
-            echo -e "  Freshness:       ${YELLOW}○ Within 24 hours${NC}"
-        else
-            echo -e "  Freshness:       ${RED}✗ Scan overdue${NC}"
-        fi
+    if [ ! -f "$STATUS_FILE" ] || ! command -v jq &>/dev/null; then
+        print_status "$YELLOW" "⚠" "No scan data available"
         echo ""
-        
-        # ══════════════════════════════════════════════════════════
-        # COMPLIANCE CARD
-        # ══════════════════════════════════════════════════════════
-        echo -e "${CYAN}╔════════════════════════════════════════════════════════╗${NC}"
-        echo -e "${CYAN}║${NC} ${COMP_COLOR}${COMP_ICON}${NC} ${CYAN}SECURITY COMPLIANCE${NC}                                    ${CYAN}║${NC}"
-        echo -e "${CYAN}╚════════════════════════════════════════════════════════╝${NC}"
-        echo -e "  Compliance:      ${COMP_COLOR}${COMPLIANCE}%${NC}"
-        
-        # Progress bar
-        BAR_WIDTH=50
-        FILLED=$((COMPLIANCE * BAR_WIDTH / 100))
-        EMPTY=$((BAR_WIDTH - FILLED))
-        printf "  "
-        printf "%b" "$COMP_COLOR"
-        for ((i=0; i<FILLED; i++)); do printf "█"; done
-        printf "%b" "$NC"
-        for ((i=0; i<EMPTY; i++)); do printf "░"; done
-        printf "\n"
-        
-        if [ ${#ISSUES[@]} -gt 0 ]; then
-            echo -e "  ${RED}Issues Found:${NC}"
-            for issue in "${ISSUES[@]}"; do
-                echo -e "    ${RED}• $issue${NC}"
-            done
-        else
-            echo -e "  ${GREEN}✓ All systems operational${NC}"
-        fi
-        echo ""
-        
-        # ══════════════════════════════════════════════════════════
-        # SYSTEM UPDATES CARD
-        # ══════════════════════════════════════════════════════════
-        echo -e "${CYAN}╔════════════════════════════════════════════════════════╗${NC}"
-        echo -e "${CYAN}║${NC} 🔄 ${CYAN}SYSTEM UPDATES${NC}                                         ${CYAN}║${NC}"
-        echo -e "${CYAN}╚════════════════════════════════════════════════════════╝${NC}"
-        
-        if [ "$UPD" = "0" ]; then
-            echo -e "  Available:       ${GREEN}0 updates (system up to date)${NC}"
-            echo -e "  Type:            ${GREEN}All packages current${NC}"
-        elif [ "$UPD" = "1" ]; then
-            echo -e "  Available:       ${GREEN}1 update available${NC}"
-            echo -e "  Type:            ${YELLOW}Security + Regular updates${NC}"
-        elif [ "$UPD" -le 5 ]; then
-            echo -e "  Available:       ${YELLOW}$UPD updates available${NC}"
-            echo -e "  Type:            ${YELLOW}Security + Regular updates${NC}"
-        else
-            echo -e "  Available:       ${RED}$UPD updates available${NC}"
-            echo -e "  Type:            ${RED}Security + Regular updates${NC}"
-        fi
-        
-        echo -e "  Auto-Apply:      ${GREEN}Enabled (during scans)${NC}"
-        echo -e "  Apply Now:       ${CYAN}sudo security-scan${NC}"
-        
-        echo -e "  Auto-Update:     ${GREEN}● Enabled${NC}"
-        echo -e "  Schedule:        ${BLUE}Daily at 2:00 AM${NC}"
-        echo -e "  Last Check:      ${YELLOW}During last scan${NC}"
-        echo ""
-        
-        # ══════════════════════════════════════════════════════════
-        # SERVICES CARD
-        # ══════════════════════════════════════════════════════════
-        echo -e "${CYAN}╔════════════════════════════════════════════════════════╗${NC}"
-        echo -e "${CYAN}║${NC} ⚙️  ${CYAN}SERVICES STATUS${NC}                                        ${CYAN}║${NC}"
-        echo -e "${CYAN}╚════════════════════════════════════════════════════════╝${NC}"
-        
-        # ClamAV daemon - check if DB exists first
-        if [ -f /var/lib/clamav/daily.cvd ] || [ -f /var/lib/clamav/daily.cld ]; then
-            if systemctl is-active --quiet clamd@scan 2>/dev/null || systemctl is-active --quiet clamav-daemon 2>/dev/null; then
-                echo -e "  ClamAV Daemon:   ${GREEN}● Running${NC}"
-            else
-                # Try to start it if DB is available
-                systemctl start clamd@scan 2>/dev/null || systemctl start clamav-daemon 2>/dev/null || true
-                sleep 1
-                if systemctl is-active --quiet clamd@scan 2>/dev/null || systemctl is-active --quiet clamav-daemon 2>/dev/null; then
-                    echo -e "  ClamAV Daemon:   ${GREEN}● Running${NC}"
-                else
-                    echo -e "  ClamAV Daemon:   ${YELLOW}○ Starting...${NC}"
-                fi
-            fi
-        else
-            echo -e "  ClamAV Daemon:   ${YELLOW}○ Waiting for virus DB${NC}"
-        fi
-        
-        # FreshClam (virus DB updater) - check timer/service
-        if systemctl is-active --quiet clamav-freshclam 2>/dev/null; then
-            echo -e "  FreshClam:       ${GREEN}● Active (updating now)${NC}"
-        elif systemctl is-enabled --quiet clamav-freshclam 2>/dev/null; then
-            echo -e "  FreshClam:       ${GREEN}✓ Enabled (auto-updates)${NC}"
-        else
-            echo -e "  FreshClam:       ${YELLOW}○ Updates during scans${NC}"
-        fi
-        
-        # Cron scheduler
-        if [ -f /etc/cron.d/security-monitor ]; then
-            echo -e "  Scheduled Scans: ${GREEN}● Active${NC} (daily at 2:00 AM)"
-        else
-            echo -e "  Scheduled Scans: ${RED}✗ Not configured${NC}"
-        fi
-        
-        # Auto updates
-        if systemctl is-enabled --quiet dnf-automatic.timer 2>/dev/null || systemctl is-enabled --quiet unattended-upgrades 2>/dev/null; then
-            echo -e "  Auto Updates:    ${GREEN}● Enabled${NC}"
-        else
-            echo -e "  Auto Updates:    ${YELLOW}○ Check manually${NC}"
-        fi
-        echo ""
-        
-        # ══════════════════════════════════════════════════════════
-        # VIRUS DATABASE CARD
-        # ══════════════════════════════════════════════════════════
-        echo -e "${CYAN}╔════════════════════════════════════════════════════════╗${NC}"
-        echo -e "${CYAN}║${NC} 🦠 ${CYAN}VIRUS DATABASE${NC}                                         ${CYAN}║${NC}"
-        echo -e "${CYAN}╚════════════════════════════════════════════════════════╝${NC}"
-        
-        if [ -f /var/lib/clamav/daily.cvd ] || [ -f /var/lib/clamav/daily.cld ]; then
-            DB_DATE=$(stat -c %y /var/lib/clamav/daily.c* 2>/dev/null | head -1 | cut -d' ' -f1)
-            DB_SIZE=$(du -sh /var/lib/clamav/ 2>/dev/null | awk '{print $1}')
-            DB_COUNT=$(ls -1 /var/lib/clamav/*.{cvd,cld} 2>/dev/null | wc -l)
-            
-            echo -e "  Status:          ${GREEN}✓ Active and loaded${NC}"
-            echo -e "  Last Updated:    ${YELLOW}$DB_DATE${NC}"
-            echo -e "  Database Size:   $DB_SIZE"
-            echo -e "  Database Files:  $DB_COUNT files loaded"
-            echo -e "  Next Update:     ${BLUE}Automatic (freshclam)${NC}"
-        else
-            # Check multiple log locations for cooldown
-            COOLDOWN_FOUND=0
-            COOLDOWN_TIME=""
-            
-            for log in /var/log/clamav/freshclam.log /var/log/freshclam.log /var/log/messages /var/log/syslog; do
-                if [ -f "$log" ]; then
-                    COOLDOWN_MSG=$(grep -i "cool-down\|cooldown\|rate.*limit\|forbidden" "$log" 2>/dev/null | tail -1)
-                    if [ -n "$COOLDOWN_MSG" ]; then
-                        COOLDOWN_FOUND=1
-                        # Try to extract time - look for ISO format or "until after:" format
-                        COOLDOWN_TIME=$(echo "$COOLDOWN_MSG" | grep -oP '(?<=until after: )\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}' | tail -1)
-                        [ -n "$COOLDOWN_TIME" ] && break
-                    fi
-                fi
-            done
-            
-            if [ $COOLDOWN_FOUND -eq 1 ]; then
-                echo -e "  Status:          ${YELLOW}⚠ CDN Rate Limited${NC}"
-                echo -e "  Reason:          ${BLUE}ClamAV CDN cooldown (normal for new installs)${NC}"
-                if [ -n "$COOLDOWN_TIME" ]; then
-                    echo -e "  Cooldown Until:  ${YELLOW}$COOLDOWN_TIME${NC}"
-                else
-                    echo -e "  Cooldown:        ${YELLOW}Check back in 1-2 hours${NC}"
-                fi
-                echo -e "  Action:          ${GREEN}Will auto-retry after cooldown${NC}"
-            else
-                echo -e "  Status:          ${YELLOW}⚠ Initializing...${NC}"
-                echo -e "  Action:          ${BLUE}First update in progress${NC}"
-                echo -e "  Info:            FreshClam downloading definitions"
-                echo -e "  Check Logs:      ${CYAN}sudo tail /var/log/clamav/freshclam.log${NC}"
-            fi
-        fi
-        echo ""
-        
-    else
-        echo -e "${YELLOW}⚠ No scan data available${NC}"
-        echo ""
-        echo -e "Run your first scan:"
+        echo "Run your first scan:"
         echo -e "  ${CYAN}sudo security-monitor scan${NC}"
         echo ""
+        return
     fi
     
-    # ══════════════════════════════════════════════════════════
-    # QUICK ACTIONS
-    # ══════════════════════════════════════════════════════════
+    # Load status data
+    local last=$(jq -r '.last_scan // "Never"' "$STATUS_FILE")
+    local status=$(jq -r '.scan_status // "unknown"' "$STATUS_FILE")
+    local infected=$(jq -r '.infected_files // "0"' "$STATUS_FILE")
+    local scanned=$(jq -r '.scanned_files // "0"' "$STATUS_FILE")
+    local updates=$(jq -r '.updates_available // "0"' "$STATUS_FILE" | tr -d '\n' | tr -d ' ')
+    
+    # Validate
+    updates=$(validate_integer "$updates")
+    
+    # Display cards
+    display_scan_card "$last" "$status" "$infected" "$scanned"
+    display_compliance_card "$infected"
+    display_updates_card "$updates"
+    display_services_card
+    display_virus_db_card
+    display_quick_actions
+}
+
+display_scan_card() {
+    echo -e "${CYAN}╔════════════════════════════════════════════════════════╗${NC}"
+    echo -e "${CYAN}║${NC} 📊 ${CYAN}SCAN STATUS${NC}                                            ${CYAN}║${NC}"
+    echo -e "${CYAN}╚════════════════════════════════════════════════════════╝${NC}"
+    
+    local last="$1" status="$2" infected="$3" scanned="$4"
+    
+    if [ "$status" = "clean" ]; then
+        print_status "$GREEN" "✓" "  Status: CLEAN"
+    else
+        print_status "$RED" "⚠" "  Status: ATTENTION REQUIRED"
+    fi
+    
+    echo "  Last Scan: $last"
+    echo "  Files Scanned: $scanned"
+    echo "  Infected: $infected"
+    echo ""
+}
+
+display_compliance_card() {
+    echo -e "${CYAN}╔════════════════════════════════════════════════════════╗${NC}"
+    echo -e "${CYAN}║${NC} ✓ ${CYAN}SECURITY COMPLIANCE${NC}                                    ${CYAN}║${NC}"
+    echo -e "${CYAN}╚════════════════════════════════════════════════════════╝${NC}"
+    
+    local infected="$1"
+    local compliance=100
+    
+    [ "$infected" != "0" ] && compliance=50
+    [ ! -f /etc/cron.d/security-monitor ] && compliance=0
+    
+    echo "  Compliance: ${compliance}%"
+    echo ""
+}
+
+display_updates_card() {
+    echo -e "${CYAN}╔════════════════════════════════════════════════════════╗${NC}"
+    echo -e "${CYAN}║${NC} 🔄 ${CYAN}SYSTEM UPDATES${NC}                                         ${CYAN}║${NC}"
+    echo -e "${CYAN}╚════════════════════════════════════════════════════════╝${NC}"
+    
+    local updates="$1"
+    
+    if [ "$updates" = "0" ]; then
+        print_status "$GREEN" "✓" "  System up to date (0 updates)"
+    else
+        print_status "$YELLOW" "⚠" "  $updates updates available"
+    fi
+    
+    echo "  Auto-Apply: Enabled (during scans)"
+    echo ""
+}
+
+display_services_card() {
+    echo -e "${CYAN}╔════════════════════════════════════════════════════════╗${NC}"
+    echo -e "${CYAN}║${NC} ⚙️  ${CYAN}SERVICES STATUS${NC}                                        ${CYAN}║${NC}"
+    echo -e "${CYAN}╚════════════════════════════════════════════════════════╝${NC}"
+    
+    # ClamAV Daemon
+    if systemctl is-active --quiet clamd@scan clamav-daemon 2>/dev/null; then
+        print_status "$GREEN" "●" "  ClamAV Daemon: Running"
+    else
+        print_status "$YELLOW" "○" "  ClamAV Daemon: On-demand"
+    fi
+    
+    # FreshClam
+    if systemctl is-active --quiet clamav-freshclam 2>/dev/null; then
+        print_status "$GREEN" "●" "  FreshClam: Active (updating now)"
+    elif systemctl is-enabled --quiet clamav-freshclam 2>/dev/null; then
+        print_status "$GREEN" "✓" "  FreshClam: Enabled (auto-updates)"
+    else
+        print_status "$YELLOW" "○" "  FreshClam: Updates during scans"
+    fi
+    
+    # Scheduled Scans
+    if [ -f /etc/cron.d/security-monitor ]; then
+        print_status "$GREEN" "●" "  Scheduled Scans: Active (2:00 AM daily)"
+    else
+        print_status "$RED" "✗" "  Scheduled Scans: Not configured"
+    fi
+    
+    echo ""
+}
+
+display_virus_db_card() {
+    echo -e "${CYAN}╔════════════════════════════════════════════════════════╗${NC}"
+    echo -e "${CYAN}║${NC} 🦠 ${CYAN}VIRUS DATABASE${NC}                                         ${CYAN}║${NC}"
+    echo -e "${CYAN}╚════════════════════════════════════════════════════════╝${NC}"
+    
+    if [ -f /var/lib/clamav/daily.cvd ] || [ -f /var/lib/clamav/daily.cld ]; then
+        local db_date=$(stat -c %y /var/lib/clamav/daily.c* 2>/dev/null | head -1 | cut -d' ' -f1)
+        print_status "$GREEN" "✓" "  Status: Active and loaded"
+        echo "  Last Updated: $db_date"
+    else
+        print_status "$YELLOW" "⚠" "  Status: Initializing..."
+    fi
+    
+    echo ""
+}
+
+display_quick_actions() {
     echo -e "${CYAN}╔════════════════════════════════════════════════════════╗${NC}"
     echo -e "${CYAN}║${NC} ⚡ ${CYAN}QUICK ACTIONS${NC}                                          ${CYAN}║${NC}"
     echo -e "${CYAN}╚════════════════════════════════════════════════════════╝${NC}"
     echo ""
-    echo -e "  ${GREEN}Force Scan Now:${NC}"
-    echo -e "    ${CYAN}sudo security-scan${NC}      or  ${CYAN}sudo security-monitor scan${NC}"
+    echo -e "  ${GREEN}Force Scan:${NC}        ${CYAN}security-scan${NC}"
+    echo -e "  ${GREEN}View Status:${NC}       ${CYAN}security-status${NC}"
+    echo -e "  ${GREEN}Check Health:${NC}      ${CYAN}security-health${NC}"
     echo ""
-    echo -e "  ${GREEN}View Status:${NC}"
-    echo -e "    ${CYAN}security-status${NC}         or  ${CYAN}security-monitor status${NC}"
-    echo ""
-    echo -e "  ${GREEN}Check Health:${NC}"
-    echo -e "    ${CYAN}sudo security-health${NC}    or  ${CYAN}sudo security-manager health${NC}"
-    echo ""
-    echo -e "  ${GREEN}Update Virus DB:${NC}"
-    echo -e "    ${CYAN}sudo freshclam${NC}          (manual virus definition update)"
-    echo ""
-    echo -e "  ${GREEN}System Updates:${NC}"
-    if [ "$OS" = "amzn" ]; then
-        echo -e "    ${CYAN}sudo dnf upgrade -y${NC}     (apply all pending updates)"
-    else
-        echo -e "    ${CYAN}sudo apt-get update && sudo apt-get upgrade -y${NC}"
-    fi
-    echo ""
+}
+
+# ============================================================================
+# MAIN ENTRY POINT
+# ============================================================================
+
+main() {
+    local command="${1:-status}"
+    local arg2="${2:-}"
     
-else
-    echo "Security Monitor - Scan and Status"
-    echo ""
-    echo "Usage: security-monitor [scan|status]"
-    echo ""
-    echo "Commands:"
-    echo "  scan   - Run full security scan (virus definitions + updates + malware)"
-    echo "  status - Show security status dashboard (default)"
-    echo ""
-    echo "Examples:"
-    echo "  sudo security-monitor scan      # Run scan"
-    echo "  security-monitor status         # View status"
-    echo "  security-monitor                # Same as status"
-fi
+    case "$command" in
+        scan)
+            run_security_scan "$arg2"
+            ;;
+        status|"")
+            show_status_dashboard
+            ;;
+        *)
+            echo "Usage: security-monitor [scan|status]"
+            echo ""
+            echo "Commands:"
+            echo "  scan [quick|full]  - Run security scan (default: quick)"
+            echo "  status             - Show dashboard (default)"
+            exit 1
+            ;;
+    esac
+}
+
+# Run main function
+main "$@"
