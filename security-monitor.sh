@@ -18,8 +18,15 @@ NC='\033[0m'
 [ -f /etc/os-release ] && . /etc/os-release && OS=$ID
 mkdir -p "$SECURITY_DIR" "$LOG_DIR"
 
+# Detect scan mode: quick (default for manual), full (for cron)
+SCAN_MODE="${2:-quick}"
 if [ "$1" = "scan" ]; then
-    echo -e "${BLUE}Running security scan...${NC}"
+    if [ "$SCAN_MODE" = "full" ]; then
+        echo -e "${BLUE}Running FULL security scan...${NC}"
+    else
+        echo -e "${BLUE}Running quick security scan...${NC}"
+        echo -e "${CYAN}(For full scan, use: security-monitor scan full)${NC}"
+    fi
     TIMESTAMP=$(date -Iseconds)
     
     echo -e "${YELLOW}[1/3] Updating virus definitions${NC}"
@@ -44,18 +51,31 @@ if [ "$1" = "scan" ]; then
     echo -e "${YELLOW}[2/3] Applying system updates${NC}"
     case "$OS" in
         ubuntu|debian)
-            apt-get update -qq
+            apt-get update -qq 2>/dev/null
             UPDATES=$(apt list --upgradable 2>/dev/null | grep -c upgradable || echo "0")
-            echo "  $UPDATES updates available before applying"
-            DEBIAN_FRONTEND=noninteractive apt-get upgrade -y -qq 2>&1 | tail -5
-            DEBIAN_FRONTEND=noninteractive apt-get autoremove -y -qq 2>&1 | tail -3
+            UPDATES=$(echo "$UPDATES" | tr -d '\n' | tr -d ' ')
+            if [ -n "$UPDATES" ] && [ "$UPDATES" -gt 0 ] 2>/dev/null; then
+                echo "  Found $UPDATES updates, applying..."
+                DEBIAN_FRONTEND=noninteractive apt-get upgrade -y -qq 2>&1 | grep -E "^(Setting up|Processing)" | tail -5
+                DEBIAN_FRONTEND=noninteractive apt-get autoremove -y -qq 2>&1 | tail -1
+                echo -e "  ${GREEN}✓ Updates applied${NC}"
+            else
+                UPDATES="0"
+                echo -e "  ${GREEN}✓ System up to date${NC}"
+            fi
             ;;
         amzn)
-            dnf check-update -q || true
-            UPDATES=$(dnf list updates 2>/dev/null | tail -n +2 | wc -l || echo "0")
-            echo "  $UPDATES updates available before applying"
-            dnf upgrade -y --refresh 2>&1 | tail -10
-            dnf autoremove -y 2>&1 | tail -3
+            dnf check-update -q 2>/dev/null || true
+            UPDATES=$(dnf list updates 2>/dev/null | tail -n +2 | grep -v "^$" | wc -l | tr -d ' ')
+            if [ -n "$UPDATES" ] && [ "$UPDATES" -gt 0 ] 2>/dev/null; then
+                echo "  Found $UPDATES updates, applying..."
+                dnf upgrade -y --refresh 2>&1 | grep -E "^(Installing|Upgrading|Complete)" | tail -8
+                dnf autoremove -y 2>&1 | tail -1
+                echo -e "  ${GREEN}✓ Updates applied${NC}"
+            else
+                UPDATES="0"
+                echo -e "  ${GREEN}✓ System up to date${NC}"
+            fi
             ;;
         *)
             UPDATES="0"
@@ -64,30 +84,36 @@ if [ "$1" = "scan" ]; then
     esac
     
     echo -e "${YELLOW}[3/3] Scanning for malware${NC}"
-    SCAN_LOG="$LOG_DIR/scan.log"
+    SCAN_LOG="$LOG_DIR/scan-$(date +%s).log"
     
-    # Show progress during scan
-    (
-        clamscan -r -i \
-            --exclude-dir="^/sys" \
-            --exclude-dir="^/proc" \
-            --exclude-dir="^/dev" \
-            --log="$SCAN_LOG" \
-            --max-filesize=500M \
-            /home /root /opt /tmp 2>&1 &
-        SCAN_PID=$!
-        
-        # Show progress while scanning
-        while kill -0 $SCAN_PID 2>/dev/null; do
-            if [ -f "$SCAN_LOG" ]; then
-                CURRENT=$(grep -c "^/" "$SCAN_LOG" 2>/dev/null || echo "0")
-                printf "\r  Scanning: %d files checked..." "$CURRENT"
-            fi
-            sleep 2
-        done
-        wait $SCAN_PID
-        printf "\r  ✓ Scan complete!                    \n"
-    )
+    # Choose scan paths based on mode
+    if [ "$SCAN_MODE" = "full" ]; then
+        echo "  Mode: FULL SCAN (all directories, 10-30 minutes)"
+        SCAN_PATHS="/home /root /opt /tmp /var /usr/local"
+        SCAN_OPTS=""
+    else
+        echo "  Mode: QUICK SCAN (critical directories, 30-90 seconds)"
+        SCAN_PATHS="/home /root"
+        # Quick mode: skip large files, limit recursion
+        SCAN_OPTS="--max-filesize=50M --max-scansize=100M --max-recursion=5"
+    fi
+    
+    echo "  Scanning: $SCAN_PATHS"
+    echo ""
+    
+    # Run optimized scan
+    clamscan -r -i \
+        --exclude-dir="^/sys" \
+        --exclude-dir="^/proc" \
+        --exclude-dir="^/dev" \
+        --exclude="\.git" \
+        --exclude="node_modules" \
+        --exclude="\.cache" \
+        $SCAN_OPTS \
+        $SCAN_PATHS 2>&1 | tee "$SCAN_LOG" || true
+    
+    echo ""
+    echo -e "${GREEN}✓ Scan complete!${NC}"
     
     # Restart freshclam service if it was running before
     if [ $FRESHCLAM_WAS_RUNNING -eq 1 ]; then

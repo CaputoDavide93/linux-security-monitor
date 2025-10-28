@@ -212,7 +212,7 @@ setup_automation() {
     show_progress "5" "6" "Setting up cron"
     
     cat > "$CRON_FILE" <<'EOF'
-0 2 * * * root /usr/local/bin/security-monitor scan >/dev/null 2>&1
+0 2 * * * root /usr/local/bin/security-monitor scan full >/dev/null 2>&1
 0 */6 * * * root /usr/local/bin/security-manager health >/dev/null 2>&1
 EOF
     
