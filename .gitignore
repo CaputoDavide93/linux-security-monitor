@@ -1,0 +1,30 @@
+# Security Monitor .gitignore
+
+# Runtime data
+/var/lib/security-monitor/
+/var/log/security-monitor/
+
+# Status files
+status.json
+*.log
+
+# Temporary files
+*.tmp
+*.swp
+*~
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# IDE files
+.vscode/
+.idea/
+*.sublime-*
+
+# Backup files
+*.bak
+*.backup
+
+# Test files
+test-*.sh
