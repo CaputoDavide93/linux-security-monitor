@@ -152,7 +152,12 @@ elif [ "$1" = "status" ] || [ -z "$1" ]; then
         STATUS=$(jq -r '.scan_status // "unknown"' "$STATUS_FILE")
         INF=$(jq -r '.infected_files // "0"' "$STATUS_FILE")
         SCN=$(jq -r '.scanned_files // "0"' "$STATUS_FILE")
-        UPD=$(jq -r '.updates_available // "0"' "$STATUS_FILE")
+        UPD=$(jq -r '.updates_available // "0"' "$STATUS_FILE" | tr -d '\n' | tr -d ' ')
+        
+        # Ensure UPD is a valid integer
+        if ! [[ "$UPD" =~ ^[0-9]+$ ]]; then
+            UPD="0"
+        fi
         
         # Calculate time since last scan
         if [ "$LAST" != "Never" ]; then
@@ -324,11 +329,13 @@ elif [ "$1" = "status" ] || [ -z "$1" ]; then
             echo -e "  ClamAV Daemon:   ${YELLOW}○ Waiting for virus DB${NC}"
         fi
         
-        # FreshClam (virus DB updater)
+        # FreshClam (virus DB updater) - check timer/service
         if systemctl is-active --quiet clamav-freshclam 2>/dev/null; then
-            echo -e "  FreshClam:       ${GREEN}● Running${NC}"
+            echo -e "  FreshClam:       ${GREEN}● Active (updating now)${NC}"
+        elif systemctl is-enabled --quiet clamav-freshclam 2>/dev/null; then
+            echo -e "  FreshClam:       ${GREEN}✓ Enabled (auto-updates)${NC}"
         else
-            echo -e "  FreshClam:       ${RED}✗ Stopped${NC}"
+            echo -e "  FreshClam:       ${YELLOW}○ Updates during scans${NC}"
         fi
         
         # Cron scheduler
