@@ -51,34 +51,26 @@ source /etc/profile.d/security-monitor.sh
 
 | Command | Ubuntu/Debian | Amazon Linux 2023 | Description |
 |---------|---------------|-------------------|-------------|
-| `security-status` | ✅ **No sudo** | ✅ **No sudo** | View security dashboard |
-| `security-scan` | ❌ **Needs sudo** | ❌ **Needs sudo** | Run malware scan |
-| `security-health` | ❌ **Needs sudo** | ❌ **Needs sudo** | Check system health |
-| `security-update` | ❌ **Needs sudo** | ❌ **Needs sudo** | Update virus definitions |
-| `security-check-virus` | ❌ **Needs sudo** | ❌ **Needs sudo** | Check virus database |
+| `security-status` | ✅ **No sudo needed** | ✅ **No sudo needed** | View security dashboard |
+| `security-scan` | ✅ **No sudo needed** | ✅ **No sudo needed** | Run malware scan |
+| `security-health` | ✅ **No sudo needed** | ✅ **No sudo needed** | Check system health |
 
-> **Note:** All shortcuts are **shell functions** (not aliases) and work in all contexts including scripts and non-interactive shells.
+> **Note:** All shortcuts are **shell functions** (not aliases) and work in all contexts including scripts and non-interactive shells. The functions internally use `sudo` where needed, so you don't have to remember when to use it.
 
 ### Quick Commands
 
 ```bash
-# View status dashboard (NO SUDO NEEDED)
+# View status dashboard (no sudo needed - works for all users)
 security-status
 
-# Run quick scan (~30-90 seconds)
-sudo security-scan
+# Run quick scan (~30-90 seconds, no sudo needed)
+security-scan
 
-# Run full system scan (~10-30 minutes)
-sudo security-scan full
+# Run full system scan (~10-30 minutes, no sudo needed)
+security-scan full
 
-# Check system health
-sudo security-health
-
-# Update virus definitions manually
-sudo security-update
-
-# Check virus database status
-sudo security-check-virus
+# Check system health (no sudo needed)
+security-health
 ```
 
 ### Alternative Direct Commands
@@ -86,17 +78,17 @@ sudo security-check-virus
 If shortcuts don't work, use the full paths:
 
 ```bash
-# View status (no sudo)
+# View status (no sudo needed)
 /usr/local/bin/security-monitor status
 
-# Run scans (needs sudo)
-sudo /usr/local/bin/security-monitor scan
-sudo /usr/local/bin/security-monitor scan full
+# Run scans (no sudo needed)
+/usr/local/bin/security-monitor scan
+/usr/local/bin/security-monitor scan full
 
-# Health check (needs sudo)
-sudo /usr/local/bin/security-manager health
+# Health check (no sudo needed)
+/usr/local/bin/security-manager health
 
-# Update virus DB (needs sudo)
+# Manual virus database update (sudo required)
 sudo freshclam
 ```
 
@@ -159,20 +151,20 @@ The `security-status` command displays a comprehensive dashboard with 6 detailed
 ╚════════════════════════════════════════════════════════╝
 
   Force Scan Now:
-    sudo security-scan       or  sudo security-monitor scan
+    security-scan            or  security-monitor scan
 
   View Status:
-    security-status         or  security-monitor status
+    security-status          or  security-monitor status
 
   Check Health:
-    sudo security-health    or  sudo security-manager health
+    security-health          or  security-manager health
 
   Update Virus DB:
-    sudo freshclam          (manual virus definition update)
+    sudo freshclam           (manual virus definition update)
 
   System Updates:
-    sudo apt upgrade -y     (Ubuntu/Debian)
-    sudo dnf upgrade -y     (Amazon Linux)
+    sudo apt upgrade -y      (Ubuntu/Debian)
+    sudo dnf upgrade -y      (Amazon Linux)
 ```
 
 ---
