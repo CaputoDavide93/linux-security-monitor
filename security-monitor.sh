@@ -5,7 +5,7 @@
 # Description: Automated security scanning with ClamAV and system updates
 ################################################################################
 
-set -euo pipefail  # Exit on error, undefined vars, pipe failures
+set -eo pipefail  # Exit on error, pipe failures (but allow unset vars for sourcing)
 
 # ============================================================================
 # CONFIGURATION
@@ -23,7 +23,12 @@ readonly RED='\033[0;31m'
 readonly NC='\033[0m'
 
 # Detect OS
-[ -f /etc/os-release ] && . /etc/os-release && readonly OS="${ID:-unknown}" || readonly OS="unknown"
+if [ -f /etc/os-release ]; then
+    . /etc/os-release
+    OS="${ID:-unknown}"
+else
+    OS="unknown"
+fi
 
 # Ensure directories exist
 mkdir -p "$SECURITY_DIR" "$LOG_DIR"
@@ -213,7 +218,7 @@ save_scan_results() {
 # ============================================================================
 
 show_status_dashboard() {
-    clear
+    command clear 2>/dev/null || true
     echo ""
     echo -e "${BLUE}═══════════════════════════════════════════════════════════${NC}"
     echo -e "${BLUE}         🛡️  SECURITY STATUS DASHBOARD${NC}"

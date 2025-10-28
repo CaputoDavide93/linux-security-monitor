@@ -5,7 +5,7 @@
 # Description: Installs, configures, and maintains security monitoring system
 ################################################################################
 
-set -euo pipefail
+set -eo pipefail  # Exit on error, pipe failures (but allow unset vars for sourcing)
 
 # ============================================================================
 # CONFIGURATION
@@ -610,7 +610,7 @@ do_uninstall() {
 # ============================================================================
 
 show_menu() {
-    clear
+    command clear 2>/dev/null || true
     echo ""
     echo -e "${BLUE}${BOLD}═══════════════════════════════════${NC}"
     echo -e "${BLUE}${BOLD}  Security Manager v$VERSION${NC}"
