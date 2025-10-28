@@ -173,37 +173,36 @@ The `security-status` command displays a comprehensive dashboard with 6 detailed
 
 ### Scheduled Tasks
 
-The system runs automatically via systemd timers:
+The system runs automatically via **cron jobs** in `/etc/cron.d/security-monitor`:
 
 | Task | Schedule | Command | Description |
 |------|----------|---------|-------------|
 | **Daily Scans** | 2:00 AM | `security-monitor scan` | Full scan (virus DB + updates + malware) |
 | **Health Checks** | Every 6 hours | `security-manager health` | Service monitoring & auto-healing |
 
+### View Cron Schedule
+
+```bash
+# View the cron configuration
+cat /etc/cron.d/security-monitor
+
+# Output:
+# 0 2 * * * root /usr/local/bin/security-monitor scan >/dev/null 2>&1
+# 0 */6 * * * root /usr/local/bin/security-manager health >/dev/null 2>&1
+```
+
 ### Manual Scheduling
 
-To change scan schedule:
+To change scan schedule, edit the cron file:
 
 ```bash
-# Ubuntu/Debian
-sudo systemctl edit security-scan.timer
+# Edit cron schedule
+sudo nano /etc/cron.d/security-monitor
 
-# Amazon Linux 2023
-sudo systemctl edit security-scan.timer
-```
+# Change to 3:00 AM:
+# 0 3 * * * root /usr/local/bin/security-monitor scan >/dev/null 2>&1
 
-Add this content:
-```ini
-[Timer]
-OnCalendar=
-OnCalendar=daily
-OnCalendar=03:00
-```
-
-Then reload:
-```bash
-sudo systemctl daemon-reload
-sudo systemctl restart security-scan.timer
+# Cron will automatically pick up changes (no restart needed)
 ```
 
 ---
@@ -227,6 +226,7 @@ sudo systemctl restart security-scan.timer
 | **security-monitor.sh** | Main monitoring script | `/usr/local/bin/security-monitor` |
 | **security-manager.sh** | Installation & health checks | `/usr/local/bin/security-manager` |
 | **Shell functions** | Command shortcuts | `/etc/profile.d/security-monitor.sh` |
+| **Cron jobs** | Automated scheduling | `/etc/cron.d/security-monitor` |
 | **Status data** | Scan results & metrics | `/var/lib/security-monitor/status.json` |
 | **Scan logs** | Detailed scan output | `/var/log/security-monitor/scan.log` |
 | **ClamAV logs** | Virus DB updates | `/var/log/clamav/freshclam.log` |
@@ -250,19 +250,21 @@ sudo ./uninstall-security.sh
 ### Health & Diagnostics
 ```bash
 # Full health check
-sudo security-health
+security-health
 
 # Check service status
 sudo systemctl status clamav-daemon
 sudo systemctl status clamav-freshclam
-sudo systemctl status security-scan.timer
+
+# View scheduled tasks
+cat /etc/cron.d/security-monitor
 
 # View logs
 sudo tail -f /var/log/security-monitor/scan.log
 sudo tail -f /var/log/clamav/freshclam.log
 
-# Check virus database
-sudo security-check-virus
+# Check virus database version
+clamscan --version
 ```
 
 ### Updates
@@ -352,8 +354,8 @@ sudo security-health
 # 3. View dashboard
 security-status
 
-# 4. Check timer schedule
-systemctl list-timers security-scan.timer
+# 4. Check cron schedule
+cat /etc/cron.d/security-monitor
 
 # 5. Verify virus database
 sudo /usr/bin/clamdscan --version
