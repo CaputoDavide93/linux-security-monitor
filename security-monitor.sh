@@ -406,7 +406,7 @@ display_services_card() {
     fi
     
     # Auto Updates
-    if systemctl is-enabled --quiet unattended-upgrades dnf-automatic.timer 2>/dev/null; then
+    if systemctl is-enabled --quiet unattended-upgrades 2>/dev/null || systemctl is-enabled --quiet dnf-automatic.timer 2>/dev/null; then
         echo -e "  ${WHITE}Auto Updates:${NC}   ${GREEN}● Enabled${NC}"
     else
         echo -e "  ${WHITE}Auto Updates:${NC}   ${YELLOW}○ Manual${NC}"
