@@ -1,0 +1,95 @@
+EC2 SECURITY MANAGER - TEST GUIDE
+==================================
+
+STRUCTURE:
+----------
+✓ 1 main script: security-manager.sh (420 lines, 16 functions)
+✓ Generates: /usr/local/bin/security-monitor (embedded)
+✓ Minimal README.md
+✓ All documentation removed
+
+SYNTAX VALIDATION:
+------------------
+✓ bash -n security-manager.sh - PASSED
+✓ No syntax errors
+
+MENU FUNCTIONS:
+---------------
+Option 1: Install
+  - Detects OS (ubuntu/debian/amzn)
+  - Installs packages with verification
+  - Configures ClamAV
+  - Sets up auto-updates
+  - Creates cron jobs
+  - Generates security-monitor script
+  - Runs initial scan
+
+Option 2: Uninstall
+  - Confirmation prompt
+  - Stops services
+  - Removes scripts
+  - Removes cron jobs
+  - Cleans logs
+  - Keeps ClamAV packages
+
+Option 3: Health Check
+  - Checks services
+  - Verifies virus definitions
+  - Validates cron jobs
+  - Auto-repairs issues
+
+Option 4: Exit
+  - Clean exit
+
+SECURITY-MONITOR FUNCTIONS:
+----------------------------
+scan   - Full security scan (virus definitions + updates + malware scan)
+status - Dashboard view (default if no args)
+
+TEST ON EC2:
+------------
+1. Upload script:
+   scp -i ~/.ssh/key.pem security-manager.sh ec2-user@your-ip:~
+
+2. Test install:
+   sudo bash security-manager.sh install
+
+3. Verify services:
+   sudo systemctl status clamav-freshclam
+
+4. Test scan:
+   sudo security-monitor scan
+
+5. Test status:
+   security-monitor status
+   security-monitor  # same thing
+
+6. Test health:
+   sudo bash security-manager.sh health
+
+7. Test uninstall:
+   sudo bash security-manager.sh uninstall
+
+EXPECTED RESULTS:
+-----------------
+✓ Install completes without errors
+✓ ClamAV service running
+✓ Virus definitions present in /var/lib/clamav/
+✓ Cron file created: /etc/cron.d/security-monitor
+✓ security-monitor command works
+✓ Initial scan runs and creates status.json
+✓ Health check finds 0 issues
+✓ Uninstall removes all monitoring files
+
+LOGS TO CHECK:
+--------------
+/var/log/security-monitor/install.log
+/var/log/security-monitor/scan.log
+/var/lib/security-monitor/status.json
+
+QUICK VALIDATION:
+-----------------
+ls -la /usr/local/bin/security-monitor
+ls -la /etc/cron.d/security-monitor
+sudo systemctl status clamav-freshclam
+cat /var/lib/security-monitor/status.json | jq

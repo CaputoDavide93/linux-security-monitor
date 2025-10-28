@@ -1,6 +1,6 @@
 # 🛡️ Linux Security Monitor
 
-Automated security scanning and monitoring system for Ubuntu/Debian and Amazon Linux servers with ClamAV antivirus, automatic updates, and a beautiful status dashboard.
+Automated security scanning and monitoring system for Ubuntu/Debian and Amazon Linux servers with ClamAV antivirus, automatic updates, and a status dashboard.
 
 ## ✨ Features
 

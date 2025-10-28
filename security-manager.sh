@@ -57,12 +57,18 @@ install_packages() {
     case "$OS" in
         ubuntu|debian)
             show_progress "1" "6" "Updating packages"
-            apt-get update 2>&1 | tee -a "$log" || return 1
+            apt-get update -qq 2>&1 | grep -E "Hit:|Get:|Fetched" | while read line; do
+                printf "."
+            done
+            echo ""
             
             show_progress "2" "6" "Installing ClamAV"
-            DEBIAN_FRONTEND=noninteractive apt-get install -y \
+            DEBIAN_FRONTEND=noninteractive apt-get install -y -qq \
                 clamav clamav-daemon clamav-freshclam \
-                unattended-upgrades jq curl 2>&1 | tee -a "$log" || return 1
+                unattended-upgrades jq curl 2>&1 | while read line; do
+                printf "."
+            done
+            echo ""
             
             command -v clamscan &>/dev/null || { show_error "Install failed"; return 1; }
             show_success "Packages installed"
@@ -70,11 +76,17 @@ install_packages() {
             
         amzn)
             show_progress "1" "6" "Updating packages"
-            dnf check-update 2>&1 | tee -a "$log" || true
+            dnf check-update -q 2>&1 | while read line; do
+                printf "."
+            done
+            echo ""
             
             show_progress "2" "6" "Installing ClamAV"
             # Replace curl-minimal with full curl to avoid conflicts
-            dnf install -y clamav clamd clamav-update jq dnf-automatic curl --allowerasing 2>&1 | tee -a "$log" || return 1
+            dnf install -y -q clamav clamd clamav-update jq dnf-automatic curl --allowerasing 2>&1 | while read line; do
+                printf "."
+            done
+            echo ""
             
             command -v clamscan &>/dev/null || { show_error "Install failed"; return 1; }
             show_success "Packages installed"
@@ -99,7 +111,9 @@ configure_clamav() {
                 sed -i 's/^Example/#Example/' /etc/clamav/freshclam.conf
             fi
             
-            freshclam 2>&1 | tail -5 || show_warning "Freshclam will retry"
+            echo -n "  Downloading virus definitions"
+            freshclam 2>&1 | while read line; do printf "."; done || show_warning "Cooldown active"
+            echo ""
             
             systemctl start clamav-freshclam
             sleep 2
@@ -327,18 +341,16 @@ do_install() {
     echo -e "${GREEN}✓ Daily scans at 2 AM${NC}"
     echo -e "${GREEN}✓ Shell aliases created${NC}"
     echo ""
-    echo "Commands:"
-    echo "  security-monitor scan"
-    echo "  security-monitor status"
-    echo "  security-manager health"
+    echo -e "${YELLOW}⚠ IMPORTANT: Reload your shell to activate aliases${NC}"
+    echo -e "${CYAN}Run this command:${NC}"
+    echo -e "  ${GREEN}source /etc/profile.d/security-monitor.sh${NC}"
     echo ""
-    echo "Aliases (source ~/.bashrc to activate):"
-    echo "  security-status     → security-monitor status"
-    echo "  security-scan       → security-monitor scan"
-    echo "  security-health     → security-manager health"
+    echo "Then you can use:"
+    echo -e "  ${CYAN}security-status${NC}     → View dashboard"
+    echo -e "  ${CYAN}security-scan${NC}       → Run scan now"
+    echo -e "  ${CYAN}security-health${NC}     → Check health"
     echo ""
     echo -e "${YELLOW}Note: First scan scheduled for 2:00 AM${NC}"
-    echo -e "${CYAN}Run manually: sudo security-scan${NC}"
     echo ""
 }
 

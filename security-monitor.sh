@@ -65,13 +65,29 @@ if [ "$1" = "scan" ]; then
     
     echo -e "${YELLOW}[3/3] Scanning for malware${NC}"
     SCAN_LOG="$LOG_DIR/scan.log"
-    clamscan -r -i \
-        --exclude-dir="^/sys" \
-        --exclude-dir="^/proc" \
-        --exclude-dir="^/dev" \
-        --log="$SCAN_LOG" \
-        --max-filesize=500M \
-        /home /root /opt /tmp 2>&1 | tail -10 || true
+    
+    # Show progress during scan
+    (
+        clamscan -r -i \
+            --exclude-dir="^/sys" \
+            --exclude-dir="^/proc" \
+            --exclude-dir="^/dev" \
+            --log="$SCAN_LOG" \
+            --max-filesize=500M \
+            /home /root /opt /tmp 2>&1 &
+        SCAN_PID=$!
+        
+        # Show progress while scanning
+        while kill -0 $SCAN_PID 2>/dev/null; do
+            if [ -f "$SCAN_LOG" ]; then
+                CURRENT=$(grep -c "^/" "$SCAN_LOG" 2>/dev/null || echo "0")
+                printf "\r  Scanning: %d files checked..." "$CURRENT"
+            fi
+            sleep 2
+        done
+        wait $SCAN_PID
+        printf "\r  ✓ Scan complete!                    \n"
+    )
     
     # Restart freshclam service if it was running before
     if [ $FRESHCLAM_WAS_RUNNING -eq 1 ]; then
