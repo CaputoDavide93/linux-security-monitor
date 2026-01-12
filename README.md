@@ -1,6 +1,6 @@
 <div align="center">
 
-# 🛡️ Linux Security Monitor
+# 🛡️ EC2 - Linux Security Monitor
 
 > **Comprehensive security monitoring and hardening toolkit for Linux servers**
 
