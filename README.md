@@ -1,482 +1,362 @@
+<div align="center">
+
 # 🛡️ Linux Security Monitor
 
-Automated security scanning and monitoring system for Ubuntu/Debian and Amazon Linux servers with ClamAV antivirus, automatic updates, and a beautiful status dashboard.
+> **Comprehensive security monitoring and hardening toolkit for Linux servers**
+
+![Shell](https://img.shields.io/badge/Shell-4EAA25?style=for-the-badge&logo=gnu-bash&logoColor=white)
+![Linux](https://img.shields.io/badge/Linux-FCC624?style=for-the-badge&logo=linux&logoColor=black)
+![Security](https://img.shields.io/badge/Security-FF0000?style=for-the-badge&logo=hackaday&logoColor=white)
+![License: MIT](https://img.shields.io/badge/License-MIT-yellow?style=for-the-badge)
+
+[Features](#-features) • [Quick Start](#-quick-start) • [Configuration](#️-configuration) • [Contributing](#-contributing)
+
+</div>
+
+---
+
+## 📑 Table of Contents
+
+- [✨ Features](#-features)
+- [📋 Prerequisites](#-prerequisites)
+- [🚀 Quick Start](#-quick-start)
+- [📖 Scripts Overview](#-scripts-overview)
+- [⚙️ Configuration](#️-configuration)
+- [🔒 Security Checks](#-security-checks)
+- [📊 Reports](#-reports)
+- [🐛 Troubleshooting](#-troubleshooting)
+- [🤝 Contributing](#-contributing)
+- [📄 License](#-license)
+- [👤 Author](#-author)
+
+---
 
 ## ✨ Features
 
-- 🦠 **ClamAV Antivirus** - Automated virus definition updates and malware scanning
-- 🔄 **Automatic Updates** - Security and system updates applied automatically  
-- 📊 **Status Dashboard** - 6 detailed cards with real-time security information and progress bars
-- ⏰ **Scheduled Scans** - Daily scans at 2:00 AM via systemd timers
-- 🔧 **Health Monitoring** - Service checks every 6 hours
-- 💻 **Easy Commands** - Shell functions for all operations
-- 🎨 **Beautiful UI** - Clean terminal dashboard with color-coded status indicators
+| Feature | Description |
+|---------|-------------|
+| 🔍 **System Audit** | Comprehensive security scanning |
+| 🛡️ **Hardening** | Automated security hardening |
+| 📊 **Reporting** | Detailed security reports |
+| 🔐 **User Audit** | User and permission analysis |
+| 🌐 **Network Scan** | Open port and service detection |
+| 📝 **Logging** | Centralized security logging |
+| ⚡ **Lightweight** | Pure shell scripts, no dependencies |
+| 🔄 **Automated** | Cron-ready for scheduled monitoring |
 
 ---
 
-## 🚀 Quick Installation
+## 📋 Prerequisites
 
-### One-Line Install
+| Requirement | Version |
+|-------------|---------|
+| Linux | Any modern distro |
+| Bash | 4.0+ |
+| Root Access | Required for full functionality |
 
-```bash
-# Ubuntu/Debian
-wget -O - https://raw.githubusercontent.com/CaputoDavide93/linux-security-monitor/main/install-security.sh | sudo bash
+### Tested Distributions
 
-# Amazon Linux 2023
-wget -O - https://raw.githubusercontent.com/CaputoDavide93/linux-security-monitor/main/install-security.sh | sudo bash
-```
-
-### Manual Installation
-
-```bash
-# Download the scripts
-wget https://raw.githubusercontent.com/CaputoDavide93/linux-security-monitor/main/security-manager.sh
-wget https://raw.githubusercontent.com/CaputoDavide93/linux-security-monitor/main/security-monitor.sh
-
-# Make executable
-chmod +x security-manager.sh security-monitor.sh
-
-# Install (auto-detects OS)
-sudo ./security-manager.sh install
-
-# Activate shortcuts (or start a new shell session)
-source /etc/profile.d/security-monitor.sh
-```
+- ✅ Ubuntu 20.04 / 22.04
+- ✅ Debian 11 / 12
+- ✅ CentOS 7 / 8
+- ✅ RHEL 8 / 9
+- ✅ Fedora 36+
 
 ---
 
-## 📋 Command Reference
+## 🚀 Quick Start
 
-### 🔍 sudo Requirements by OS
-
-| Command | Ubuntu/Debian | Amazon Linux 2023 | Description |
-|---------|---------------|-------------------|-------------|
-| `security-status` | ✅ **No sudo needed** | ✅ **No sudo needed** | View security dashboard |
-| `security-scan` | ✅ **No sudo needed** | ✅ **No sudo needed** | Run malware scan |
-| `security-health` | ✅ **No sudo needed** | ✅ **No sudo needed** | Check system health |
-
-> **Note:** All shortcuts are **shell functions** (not aliases) and work in all contexts including scripts and non-interactive shells. The functions internally use `sudo` where needed, so you don't have to remember when to use it.
-
-### Quick Commands
+### 1. Clone the Repository
 
 ```bash
-# View status dashboard (no sudo needed - works for all users)
-security-status
-
-# Run quick scan (~30-90 seconds, no sudo needed)
-security-scan
-
-# Run full system scan (~10-30 minutes, no sudo needed)
-security-scan full
-
-# Check system health (no sudo needed)
-security-health
+git clone https://github.com/CaputoDavide93/linux-security-monitor.git
+cd linux-security-monitor
 ```
 
-### Alternative Direct Commands
-
-If shortcuts don't work, use the full paths:
+### 2. Make Scripts Executable
 
 ```bash
-# View status (no sudo needed)
-/usr/local/bin/security-monitor status
+chmod +x security-monitor.sh security-manager.sh
+```
 
-# Run scans (no sudo needed)
-/usr/local/bin/security-monitor scan
-/usr/local/bin/security-monitor scan full
+### 3. Run Security Monitor
 
-# Health check (no sudo needed)
-/usr/local/bin/security-manager health
+```bash
+sudo ./security-monitor.sh
+```
 
-# Manual virus database update (sudo required)
-sudo freshclam
+### 4. Run Security Manager (Interactive)
+
+```bash
+sudo ./security-manager.sh
 ```
 
 ---
 
-## 📊 Status Dashboard
+## 📖 Scripts Overview
 
-The `security-status` command displays a comprehensive dashboard with 6 detailed cards:
+### security-monitor.sh
 
+Comprehensive security monitoring script that:
+
+- Scans for security vulnerabilities
+- Checks file permissions
+- Audits user accounts
+- Analyzes network configuration
+- Generates detailed reports
+
+```bash
+# Full security scan
+sudo ./security-monitor.sh --full
+
+# Quick scan
+sudo ./security-monitor.sh --quick
+
+# Generate report
+sudo ./security-monitor.sh --report /var/log/security-report.txt
 ```
-═══════════════════════════════════════════════════════════
-         🛡️  SECURITY STATUS DASHBOARD
-═══════════════════════════════════════════════════════════
 
-╔════════════════════════════════════════════════════════╗
-║ 📊 SCAN STATUS                                            ║
-╚════════════════════════════════════════════════════════╝
-  Status:         ✓ CLEAN
-  Last Scan:      2025-10-28T15:20:14+00:00
-  Next Scan:      2025-10-29 02:00
-  Files Scanned:  7654
-  Infected:       0
-  Freshness:      ● Recently scanned
+### security-manager.sh
 
-╔════════════════════════════════════════════════════════╗
-║ ✓ SECURITY COMPLIANCE                                    ║
-╚════════════════════════════════════════════════════════╝
-  Compliance:     100%
-  ████████████████████
-  ● All systems operational
+Interactive security management tool for:
 
-╔════════════════════════════════════════════════════════╗
-║ 🔄 SYSTEM UPDATES                                         ║
-╚════════════════════════════════════════════════════════╝
-  Available:      0 updates (system up to date)
-  Type:           All packages current
-  Auto-Apply:     Enabled (during scans)
-  Apply Now:      sudo security-scan
-  Last Check:     During last scan
-  Schedule:       Daily at 2:00 AM
+- Applying security hardening
+- Managing firewall rules
+- Configuring security policies
+- Scheduling automated scans
 
-╔════════════════════════════════════════════════════════╗
-║ ⚙️  SERVICES STATUS                                        ║
-╚════════════════════════════════════════════════════════╝
-  ClamAV Daemon:  ● Running
-  FreshClam:      ● Running
-  Scheduled Scans: ● Active (daily at 2:00 AM)
-  Auto Updates:   ● Enabled
+```bash
+# Interactive mode
+sudo ./security-manager.sh
 
-╔════════════════════════════════════════════════════════╗
-║ 🦠 VIRUS DATABASE                                         ║
-╚════════════════════════════════════════════════════════╝
-  Status:         ✓ Active and loaded
-  Action:         Up to date
-  Info:           Last updated: 2025-10-28
-  Check Logs:     sudo tail /var/log/clamav/freshclam.log
+# Apply hardening profile
+sudo ./security-manager.sh --harden basic
 
-╔════════════════════════════════════════════════════════╗
-║ ⚡ QUICK ACTIONS                                          ║
-╚════════════════════════════════════════════════════════╝
-
-  Force Scan Now:
-    security-scan            or  security-monitor scan
-
-  View Status:
-    security-status          or  security-monitor status
-
-  Check Health:
-    security-health          or  security-manager health
-
-  Update Virus DB:
-    sudo freshclam           (manual virus definition update)
-
-  System Updates:
-    sudo apt upgrade -y      (Ubuntu/Debian)
-    sudo dnf upgrade -y      (Amazon Linux)
+# Check compliance
+sudo ./security-manager.sh --compliance cis
 ```
 
 ---
 
-## ⏰ Automation
+## ⚙️ Configuration
 
-### Scheduled Tasks
+### Environment Variables
 
-The system runs automatically via **cron jobs** in `/etc/cron.d/security-monitor`:
+| Variable | Description | Default |
+|----------|-------------|---------|
+| `LOG_DIR` | Log directory | `/var/log/security` |
+| `REPORT_DIR` | Report output directory | `/var/log/security/reports` |
+| `EMAIL_ALERTS` | Email for alerts | - |
+| `SEVERITY_LEVEL` | Min severity to report | `medium` |
+| `QUIET_MODE` | Suppress output | `false` |
 
-| Task | Schedule | Command | Description |
-|------|----------|---------|-------------|
-| **Daily Scans** | 2:00 AM | `security-monitor scan` | Full scan (virus DB + updates + malware) |
-| **Health Checks** | Every 6 hours | `security-manager health` | Service monitoring & auto-healing |
+### Configuration File
 
-### View Cron Schedule
-
-```bash
-# View the cron configuration
-cat /etc/cron.d/security-monitor
-
-# Output:
-# 0 2 * * * root /usr/local/bin/security-monitor scan >/dev/null 2>&1
-# 0 */6 * * * root /usr/local/bin/security-manager health >/dev/null 2>&1
-```
-
-### Manual Scheduling
-
-To change scan schedule, edit the cron file:
+Create `/etc/security-monitor.conf`:
 
 ```bash
-# Edit cron schedule
-sudo nano /etc/cron.d/security-monitor
+# Security Monitor Configuration
+LOG_DIR="/var/log/security"
+REPORT_DIR="/var/log/security/reports"
+EMAIL_ALERTS="security@example.com"
+SEVERITY_LEVEL="medium"  # low, medium, high, critical
 
-# Change to 3:00 AM:
-# 0 3 * * * root /usr/local/bin/security-monitor scan >/dev/null 2>&1
+# Scan Options
+SCAN_USERS=true
+SCAN_NETWORK=true
+SCAN_FILESYSTEM=true
+SCAN_SERVICES=true
 
-# Cron will automatically pick up changes (no restart needed)
-```
-
----
-
-## 🐧 Supported Systems
-
-| OS | Version | Status | Notes |
-|----|---------|--------|-------|
-| **Ubuntu** | 20.04+ | ✅ Tested | Uses `unattended-upgrades` |
-| **Ubuntu** | 24.04 | ✅ Tested | Production ready |
-| **Debian** | 10+ | ✅ Supported | Uses `unattended-upgrades` |
-| **Amazon Linux** | 2023 | ✅ Tested | Uses `dnf-automatic` |
-| **Amazon Linux** | 2 | ✅ Supported | Uses `yum-cron` |
-
----
-
-## 🔧 Configuration Files
-
-| File | Purpose | Location |
-|------|---------|----------|
-| **security-monitor.sh** | Main monitoring script | `/usr/local/bin/security-monitor` |
-| **security-manager.sh** | Installation & health checks | `/usr/local/bin/security-manager` |
-| **Shell functions** | Command shortcuts | `/etc/profile.d/security-monitor.sh` |
-| **Cron jobs** | Automated scheduling | `/etc/cron.d/security-monitor` |
-| **Status data** | Scan results & metrics | `/var/lib/security-monitor/status.json` |
-| **Scan logs** | Detailed scan output | `/var/log/security-monitor/scan.log` |
-| **ClamAV logs** | Virus DB updates | `/var/log/clamav/freshclam.log` |
-
----
-
-## 🛠️ Management Commands
-
-### Installation
-```bash
-# Install on new server
-sudo ./security-manager.sh install
-
-# Uninstall completely
-sudo ./uninstall-security.sh
-
-# Deploy to multiple servers
-./deploy-multiple.sh
-```
-
-### Health & Diagnostics
-```bash
-# Full health check
-security-health
-
-# Check service status
-sudo systemctl status clamav-daemon
-sudo systemctl status clamav-freshclam
-
-# View scheduled tasks
-cat /etc/cron.d/security-monitor
-
-# View logs
-sudo tail -f /var/log/security-monitor/scan.log
-sudo tail -f /var/log/clamav/freshclam.log
-
-# Check virus database version
-clamscan --version
-```
-
-### Updates
-```bash
-# Update scripts from GitHub
-cd /usr/local/bin
-sudo wget -O security-monitor.sh https://raw.githubusercontent.com/CaputoDavide93/linux-security-monitor/main/security-monitor.sh
-sudo wget -O security-manager.sh https://raw.githubusercontent.com/CaputoDavide93/linux-security-monitor/main/security-manager.sh
-sudo chmod +x security-monitor.sh security-manager.sh
+# Hardening Options
+DISABLE_ROOT_SSH=true
+ENFORCE_STRONG_PASSWORDS=true
+ENABLE_FAIL2BAN=true
 ```
 
 ---
 
-## 🔒 Security Best Practices
+## 🔒 Security Checks
 
-### Permissions
-- Scripts run with **root privileges** (sudo required for scans)
-- Status viewing requires **no sudo** (read-only access)
-- Log files readable by root only
-- Configuration files protected with 644 permissions
+### User & Access
+
+| Check | Description |
+|-------|-------------|
+| Root Login | SSH root access disabled |
+| Empty Passwords | No accounts without passwords |
+| Sudo Access | Validate sudoers configuration |
+| Failed Logins | Detect brute force attempts |
+| Inactive Users | Find dormant accounts |
 
 ### Network
-- FreshClam updates virus definitions via HTTPS
-- No incoming connections required
-- Outbound: Port 443 for virus DB updates
 
-### Data
-- Scan results stored in JSON format
-- No sensitive data logged
-- Logs rotated automatically by system
+| Check | Description |
+|-------|-------------|
+| Open Ports | Identify listening services |
+| Firewall Status | Verify firewall is active |
+| SSH Config | Secure SSH configuration |
+| Network Services | Audit running services |
 
----
+### Filesystem
 
-## 📖 Shell Functions vs Aliases
+| Check | Description |
+|-------|-------------|
+| World Writable | Find insecure permissions |
+| SUID/SGID | Locate privilege escalation risks |
+| Sensitive Files | Check /etc/passwd, /etc/shadow |
+| Mounted Drives | Verify mount options |
 
-This system uses **shell functions** instead of aliases for better compatibility:
+### System
 
-### Why Functions?
-- ✅ Work in all contexts (interactive, non-interactive, scripts)
-- ✅ Support argument pass-through with `"$@"`
-- ✅ No need for `shopt -s expand_aliases`
-- ✅ Work immediately in new SSH sessions
-
-### How They Work
-```bash
-# Function definition in /etc/profile.d/security-monitor.sh
-security-status() { sudo /usr/local/bin/security-monitor status "$@"; }
-security-scan() { sudo /usr/local/bin/security-monitor scan "$@"; }
-```
-
-### Usage in Scripts
-Functions work directly in your scripts:
-```bash
-#!/bin/bash
-# This works!
-security-status
-
-# This also works!
-sudo security-scan quick
-```
+| Check | Description |
+|-------|-------------|
+| Kernel Version | Check for known vulnerabilities |
+| Updates | Pending security updates |
+| Running Processes | Suspicious process detection |
+| Cron Jobs | Audit scheduled tasks |
 
 ---
 
-## 🧪 Testing & Verification
+## 📊 Reports
 
-### Quick Test
+### Report Types
+
 ```bash
-# Test status (no sudo)
-security-status
+# Text report
+sudo ./security-monitor.sh --report-format text
 
-# Test scan (with sudo)
-sudo security-scan
+# JSON report (for automation)
+sudo ./security-monitor.sh --report-format json
 
-# Verify services
-sudo systemctl status clamav-daemon
-sudo systemctl status security-scan.timer
+# HTML report
+sudo ./security-monitor.sh --report-format html
 ```
 
-### Full Verification
+### Sample Report Output
+
+```
+═══════════════════════════════════════════════════════
+             SECURITY AUDIT REPORT
+═══════════════════════════════════════════════════════
+Generated: 2024-01-12 10:30:00
+Hostname:  production-server-01
+═══════════════════════════════════════════════════════
+
+[CRITICAL] 2 issues found
+[HIGH]     5 issues found
+[MEDIUM]   12 issues found
+[LOW]      8 issues found
+
+─────────────────────────────────────────────────────
+CRITICAL FINDINGS:
+─────────────────────────────────────────────────────
+❌ Root SSH login is enabled
+❌ 3 accounts have empty passwords
+...
+```
+
+---
+
+## ⏰ Automated Monitoring
+
+### Cron Setup
+
 ```bash
-# 1. Check functions are loaded
-type security-status security-scan security-health
+# Edit crontab
+sudo crontab -e
 
-# 2. Run health check
-sudo security-health
+# Daily security scan at 2 AM
+0 2 * * * /opt/linux-security-monitor/security-monitor.sh --full --email
 
-# 3. View dashboard
-security-status
-
-# 4. Check cron schedule
-cat /etc/cron.d/security-monitor
-
-# 5. Verify virus database
-sudo /usr/bin/clamdscan --version
+# Weekly full report
+0 3 * * 0 /opt/linux-security-monitor/security-monitor.sh --report /var/log/security/weekly-report.txt
 ```
 
 ---
 
 ## 🐛 Troubleshooting
 
-### Commands Not Found
+### Common Issues
+
+<details>
+<summary>❌ Permission Denied</summary>
 
 ```bash
-# Option 1: Reload shell functions
-source /etc/profile.d/security-monitor.sh
+# Run with sudo
+sudo ./security-monitor.sh
 
-# Option 2: Start new shell
-bash
-
-# Option 3: Use direct paths
-/usr/local/bin/security-monitor status
-sudo /usr/local/bin/security-monitor scan
+# Or fix permissions
+chmod +x security-monitor.sh
 ```
+</details>
 
-### ClamAV Not Running
+<details>
+<summary>❌ Command Not Found</summary>
+
+Some checks require additional tools:
+```bash
+# Debian/Ubuntu
+sudo apt install net-tools procps
+
+# RHEL/CentOS
+sudo yum install net-tools procps-ng
+```
+</details>
+
+<details>
+<summary>❌ Report Not Generated</summary>
 
 ```bash
-# Check daemon status
-sudo systemctl status clamav-daemon
-
-# Start daemon (Ubuntu)
-sudo systemctl start clamav-daemon
-
-# On Amazon Linux (on-demand mode is normal)
-# ClamAV runs automatically during scans
+# Check log directory permissions
+sudo mkdir -p /var/log/security
+sudo chmod 755 /var/log/security
 ```
-
-### Virus Database Issues
-
-```bash
-# Update manually
-sudo freshclam
-
-# Check logs
-sudo tail -50 /var/log/clamav/freshclam.log
-
-# Restart service
-sudo systemctl restart clamav-freshclam
-```
-
-### Permission Denied
-
-```bash
-# Status viewing should work without sudo
-security-status
-
-# Scanning requires sudo
-sudo security-scan
-
-# If still fails, check script permissions
-ls -la /usr/local/bin/security-*
-```
+</details>
 
 ---
 
-## 📊 Performance
+## 🧪 Testing
 
-### Scan Times
+See [TEST-GUIDE.txt](TEST-GUIDE.txt) for testing instructions:
 
-| Scan Type | Files | Time | CPU | Memory |
-|-----------|-------|------|-----|--------|
-| **Quick Scan** | ~7,000 | 4-5 min | Low | ~200MB |
-| **Full Scan** | ~50,000+ | 10-30 min | Medium | ~300MB |
+```bash
+# Run in test mode (no changes)
+./security-monitor.sh --dry-run
 
-### Resource Usage
-- **Idle**: <10MB RAM
-- **Scanning**: 200-300MB RAM
-- **CPU**: Low priority (nice level 19)
-- **Disk**: <50MB for logs and status
+# Verbose output
+./security-monitor.sh --verbose
+```
 
 ---
 
 ## 🤝 Contributing
 
-Contributions welcome! Please:
+Contributions are welcome! Please see [CONTRIBUTING.md](CONTRIBUTING.md) for guidelines.
+
 1. Fork the repository
-2. Create a feature branch
-3. Test on Ubuntu and Amazon Linux
-4. Submit a pull request
+2. Create a feature branch (`git checkout -b feature/amazing-feature`)
+3. Commit changes (`git commit -m 'Add amazing feature'`)
+4. Push to branch (`git push origin feature/amazing-feature`)
+5. Open a Pull Request
 
 ---
+
+## 📄 License
+
+This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
+
+---
+
+<div align="center">
 
 ## 👤 Author
 
 **Davide Caputo**
-- GitHub: [@CaputoDavide93](https://github.com/CaputoDavide93)
-- Repository: [linux-security-monitor](https://github.com/CaputoDavide93/linux-security-monitor)
+
+[![GitHub](https://img.shields.io/badge/GitHub-CaputoDavide93-181717?style=for-the-badge&logo=github)](https://github.com/CaputoDavide93)
+[![Email](https://img.shields.io/badge/Email-CaputoDav%40gmail.com-EA4335?style=for-the-badge&logo=gmail&logoColor=white)](mailto:CaputoDav@gmail.com)
 
 ---
 
-## 📝 License
+⭐ **If this tool helped you, please give it a star!** ⭐
 
-MIT License - See LICENSE file for details
-
----
-
-## 🔄 Changelog
-
-### v2.1.0 (2025-10-28)
-- ✨ Converted aliases to shell functions for universal compatibility
-- ✨ Enhanced dashboard with 6 detailed cards and progress bars
-- ✨ Fixed auto-updates detection on both Ubuntu and Amazon Linux
-- ✨ Improved error handling with `set -eo pipefail`
-- ✨ Added comprehensive status indicators and freshness checks
-- 🐛 Fixed ANSI escape code artifacts in output
-- 🐛 Fixed clear command in non-interactive sessions
-- 📝 Consolidated all documentation into single README
-
-### v2.0.0 (2025-10-27)
-- 🎨 Complete UI redesign with color-coded cards
-- ♻️ Code refactoring: 906 → 808 lines (-11%)
-- ✅ Modular architecture with 15+ single-responsibility functions
-- 🔒 Enhanced error handling and input validation
-- 📊 Added detailed compliance dashboard
-- ⚡ Improved performance and reliability
+</div>
