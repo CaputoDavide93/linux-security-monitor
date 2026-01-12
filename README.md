@@ -15,21 +15,6 @@
 
 ---
 
-## 📑 Table of Contents
-
-- [✨ Features](#-features)
-- [📋 Prerequisites](#-prerequisites)
-- [🚀 Quick Start](#-quick-start)
-- [📖 Scripts Overview](#-scripts-overview)
-- [⚙️ Configuration](#️-configuration)
-- [🔒 Security Checks](#-security-checks)
-- [📊 Reports](#-reports)
-- [🐛 Troubleshooting](#-troubleshooting)
-- [🤝 Contributing](#-contributing)
-- [📄 License](#-license)
-- [👤 Author](#-author)
-
----
 
 ## ✨ Features
 
