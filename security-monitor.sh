@@ -203,9 +203,9 @@ save_scan_results() {
     command -v jq &>/dev/null && jq -n \
         --arg ts "$timestamp" \
         --arg status "$status" \
-        --arg inf "$(validate_integer $infected)" \
-        --arg scn "$(validate_integer $scanned)" \
-        --arg upd "$(validate_integer $updates)" \
+        --arg inf "$(validate_integer "$infected")" \
+        --arg scn "$(validate_integer "$scanned")" \
+        --arg upd "$(validate_integer "$updates")" \
         '{last_scan: $ts, scan_status: $status, infected_files: $inf, scanned_files: $scn, updates_available: $upd}' > "$STATUS_FILE"
     
     echo "  Scanned: $scanned files"
@@ -332,7 +332,7 @@ display_compliance_card() {
     local filled=$((compliance / 5))
     local i
     for i in $(seq 1 20); do
-        if [ $i -le $filled ]; then
+        if [ "$i" -le "$filled" ]; then
             echo -ne "${GREEN}█${NC}"
         else
             echo -ne "${GRAY}░${NC}"
