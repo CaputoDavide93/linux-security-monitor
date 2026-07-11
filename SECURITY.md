@@ -37,8 +37,7 @@ Include:
 1. **Run with minimum required privileges** when possible
 2. **Review scripts** before running on production systems
 3. **Keep the tool updated** for latest security checks
-4. **Secure report files** - they contain system information
-5. **Use encrypted channels** when sending reports
+4. **Secure the scan logs** in `/var/log/security-monitor/` - they contain system information
 
 ### Script Security
 
@@ -47,7 +46,7 @@ Include:
 curl https://... | sudo bash
 
 # ✅ Good - Download, review, then run
-git clone https://github.com/CaputoDavide93/linux-security-monitor.git
+git clone https://github.com/CaputoDavide93/EC2-Linux-Security-Monitor.git
 less security-monitor.sh  # Review the code
 sudo ./security-monitor.sh
 ```
@@ -55,9 +54,8 @@ sudo ./security-monitor.sh
 ## ✅ Security Checklist
 
 - [ ] Running latest version of the scripts
-- [ ] Report files have restricted permissions (600)
+- [ ] Scan logs have restricted permissions
 - [ ] Cron job logs are secured
-- [ ] Email alerts use encrypted transport
 - [ ] Scripts are verified after download
 
 ---

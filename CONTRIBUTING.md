@@ -5,7 +5,7 @@ Thank you for your interest in contributing! 🎉
 ## 🚀 Quick Start
 
 1. **Fork** the repository
-2. **Clone** your fork: `git clone https://github.com/YOUR_USERNAME/linux-security-monitor.git`
+2. **Clone** your fork: `git clone https://github.com/YOUR_USERNAME/EC2-Linux-Security-Monitor.git`
 3. **Create** a branch: `git checkout -b feature/your-feature`
 4. **Make** your changes
 5. **Test** on multiple distros
@@ -31,8 +31,8 @@ Before submitting:
 # Run shellcheck
 shellcheck security-monitor.sh security-manager.sh
 
-# Test in dry-run mode
-./security-monitor.sh --dry-run
+# Validate syntax
+bash -n security-monitor.sh && bash -n security-manager.sh
 
 # Test on multiple distributions if possible
 ```

@@ -2,313 +2,230 @@
 
 # 🛡️ EC2 - Linux Security Monitor
 
-> **Comprehensive security monitoring and hardening toolkit for Linux servers**
+**ClamAV malware scanning, automatic security updates, and a terminal status dashboard for systemd Linux — built for EC2, tested on Ubuntu and Amazon Linux**
 
 ![Shell](https://img.shields.io/badge/Shell-4EAA25?style=for-the-badge&logo=gnu-bash&logoColor=white)
 ![Linux](https://img.shields.io/badge/Linux-FCC624?style=for-the-badge&logo=linux&logoColor=black)
-![Security](https://img.shields.io/badge/Security-FF0000?style=for-the-badge&logo=hackaday&logoColor=white)
+![ClamAV](https://img.shields.io/badge/ClamAV-FF0000?style=for-the-badge&logo=hackaday&logoColor=white)
 ![License: MIT](https://img.shields.io/badge/License-MIT-yellow?style=for-the-badge)
 
-[Features](#-features) • [Quick Start](#-quick-start) • [Configuration](#️-configuration) • [Contributing](#-contributing)
+[Features](#-features) • [Quick Start](#-quick-start) • [Usage](#-usage) • [Contributing](#-contributing)
 
 </div>
 
 ---
 
-
 ## ✨ Features
 
-| Feature | Description |
-|---------|-------------|
-| 🔍 **System Audit** | Comprehensive security scanning |
-| 🛡️ **Hardening** | Automated security hardening |
-| 📊 **Reporting** | Detailed security reports |
-| 🔐 **User Audit** | User and permission analysis |
-| 🌐 **Network Scan** | Open port and service detection |
-| 📝 **Logging** | Centralized security logging |
-| ⚡ **Lightweight** | Pure shell scripts, no dependencies |
-| 🔄 **Automated** | Cron-ready for scheduled monitoring |
+| | Feature | What it does |
+|---|---------|--------------|
+| 🦠 | **ClamAV scanning** | Quick (30–90 s) or full (10–30 min) `clamscan` malware sweeps |
+| 🔄 | **Auto updates** | Applies pending security updates during every scan (apt / dnf) |
+| 🧬 | **Fresh definitions** | Runs `freshclam` before each scan and keeps the freshclam service healthy |
+| 📊 | **Status dashboard** | Terminal dashboard: last scan, infected count, services, virus DB, updates |
+| ⏰ | **Scheduled scans** | Installer drops a cron file — daily full scan at 02:00, health check every 6 h |
+| 🩺 | **Self-healing health check** | Restarts dead services and refreshes stale virus definitions (> 7 days) |
+| 📦 | **One-command install** | `security-manager.sh install` sets up packages, services, cron, and shell shortcuts |
+| 📝 | **Logging** | Everything logged under `/var/log/security-monitor/`, scan status as JSON |
 
 ---
 
 ## 📋 Prerequisites
 
-| Requirement | Version |
-|-------------|---------|
-| Linux | Any modern distro |
-| Bash | 4.0+ |
-| Root Access | Required for full functionality |
+| Requirement | Notes |
+|-------------|-------|
+| Linux + systemd | Services are managed with `systemctl` |
+| Bash 4.0+ | Both scripts are pure Bash |
+| Root access | `install`, `uninstall`, `health`, and `scan` all need `sudo` |
+| Internet access | To download ClamAV packages and virus definitions |
 
-### Tested Distributions
+### Supported distributions
 
-- ✅ Ubuntu 20.04 / 22.04
-- ✅ Debian 11 / 12
-- ✅ CentOS 7 / 8
-- ✅ RHEL 8 / 9
-- ✅ Fedora 36+
+The installer validates the OS and supports:
+
+- ✅ Ubuntu / Debian (`apt`, `unattended-upgrades`)
+- ✅ Amazon Linux 2023 (`dnf`, `dnf-automatic`)
+
+Anything else exits with `Unsupported operating system`.
 
 ---
 
 ## 🚀 Quick Start
 
-### 1. Clone the Repository
+### 1. Clone the repository
 
 ```bash
-git clone https://github.com/CaputoDavide93/linux-security-monitor.git
-cd linux-security-monitor
+git clone https://github.com/CaputoDavide93/EC2-Linux-Security-Monitor.git
+cd EC2-Linux-Security-Monitor
 ```
 
-### 2. Make Scripts Executable
+### 2. Make the scripts executable
 
 ```bash
 chmod +x security-monitor.sh security-manager.sh
 ```
 
-### 3. Run Security Monitor
+### 3. Install
 
 ```bash
-sudo ./security-monitor.sh
+sudo ./security-manager.sh install
 ```
 
-### 4. Run Security Manager (Interactive)
+The installer:
+
+1. Installs ClamAV, `jq`, `curl`, and the distro's auto-update tooling
+2. Configures `freshclam` and the ClamAV daemon
+3. Enables automatic security updates (`unattended-upgrades` / `dnf-automatic`)
+4. Creates `/etc/cron.d/security-monitor` (daily scan + 6-hourly health check)
+5. Installs the monitor to `/usr/local/bin/security-monitor`
+6. Adds shell shortcuts: `security-status`, `security-scan`, `security-health`
+
+Then reload your shell to pick up the shortcuts:
 
 ```bash
-sudo ./security-manager.sh
+source /etc/profile.d/security-monitor.sh
+```
+
+### 4. Run your first scan
+
+```bash
+sudo security-monitor scan        # quick scan (default)
+security-monitor status           # dashboard
 ```
 
 ---
 
-## 📖 Scripts Overview
+## 📖 Usage
 
 ### security-monitor.sh
 
-Comprehensive security monitoring script that:
+```text
+Usage: security-monitor [scan|status]
 
-- Scans for security vulnerabilities
-- Checks file permissions
-- Audits user accounts
-- Analyzes network configuration
-- Generates detailed reports
+  scan [quick|full]   Run a security scan (default: quick)
+  status              Show the status dashboard (default)
+```
+
+Every scan runs three steps:
+
+1. **Update virus definitions** — `freshclam` (pausing the service to avoid lock conflicts)
+2. **Apply system updates** — `apt-get upgrade` or `dnf upgrade`, security-focused
+3. **Scan for malware** — `clamscan -r -i`, excluding `/sys`, `/proc`, `/dev`, `.git`, `node_modules`, `.cache`
+
+| Mode | Paths | Typical duration |
+|------|-------|------------------|
+| `quick` (default) | `/home /root` (file-size and recursion limits) | 30–90 seconds |
+| `full` | `/home /root /opt /tmp /var /usr/local` | 10–30 minutes |
+
+Results are written to `/var/lib/security-monitor/status.json` and scan logs to
+`/var/log/security-monitor/scan-<timestamp>.log`.
 
 ```bash
-# Full security scan
-sudo ./security-monitor.sh --full
-
-# Quick scan
-sudo ./security-monitor.sh --quick
-
-# Generate report
-sudo ./security-monitor.sh --report /var/log/security-report.txt
+sudo security-monitor scan          # quick scan
+sudo security-monitor scan full     # full scan
+security-monitor status             # dashboard (also the default with no args)
 ```
+
+The `status` dashboard shows: scan status and freshness, compliance indicator,
+pending updates, ClamAV service state, virus database state, and quick actions.
 
 ### security-manager.sh
 
-Interactive security management tool for:
+```text
+Usage: security-manager.sh [install|uninstall|health]
 
-- Applying security hardening
-- Managing firewall rules
-- Configuring security policies
-- Scheduling automated scans
+  install     Install the security monitoring system
+  uninstall   Remove the security monitoring system
+  health      Perform a health check
+
+Run without arguments for an interactive menu.
+```
 
 ```bash
-# Interactive mode
-sudo ./security-manager.sh
-
-# Apply hardening profile
-sudo ./security-manager.sh --harden basic
-
-# Check compliance
-sudo ./security-manager.sh --compliance cis
+sudo ./security-manager.sh            # interactive menu
+sudo ./security-manager.sh install    # non-interactive install
+sudo ./security-manager.sh health     # check & self-heal services, defs, cron
+sudo ./security-manager.sh uninstall  # remove (asks for confirmation)
 ```
 
----
+`health` verifies — and where possible repairs — the freshclam service, the
+ClamAV daemon, virus-definition age (re-downloads if older than 7 days), the
+cron file, and the installed scripts.
 
-## ⚙️ Configuration
-
-### Environment Variables
-
-| Variable | Description | Default |
-|----------|-------------|---------|
-| `LOG_DIR` | Log directory | `/var/log/security` |
-| `REPORT_DIR` | Report output directory | `/var/log/security/reports` |
-| `EMAIL_ALERTS` | Email for alerts | - |
-| `SEVERITY_LEVEL` | Min severity to report | `medium` |
-| `QUIET_MODE` | Suppress output | `false` |
-
-### Configuration File
-
-Create `/etc/security-monitor.conf`:
-
-```bash
-# Security Monitor Configuration
-LOG_DIR="/var/log/security"
-REPORT_DIR="/var/log/security/reports"
-EMAIL_ALERTS="security@example.com"
-SEVERITY_LEVEL="medium"  # low, medium, high, critical
-
-# Scan Options
-SCAN_USERS=true
-SCAN_NETWORK=true
-SCAN_FILESYSTEM=true
-SCAN_SERVICES=true
-
-# Hardening Options
-DISABLE_ROOT_SSH=true
-ENFORCE_STRONG_PASSWORDS=true
-ENABLE_FAIL2BAN=true
-```
-
----
-
-## 🔒 Security Checks
-
-### User & Access
-
-| Check | Description |
-|-------|-------------|
-| Root Login | SSH root access disabled |
-| Empty Passwords | No accounts without passwords |
-| Sudo Access | Validate sudoers configuration |
-| Failed Logins | Detect brute force attempts |
-| Inactive Users | Find dormant accounts |
-
-### Network
-
-| Check | Description |
-|-------|-------------|
-| Open Ports | Identify listening services |
-| Firewall Status | Verify firewall is active |
-| SSH Config | Secure SSH configuration |
-| Network Services | Audit running services |
-
-### Filesystem
-
-| Check | Description |
-|-------|-------------|
-| World Writable | Find insecure permissions |
-| SUID/SGID | Locate privilege escalation risks |
-| Sensitive Files | Check /etc/passwd, /etc/shadow |
-| Mounted Drives | Verify mount options |
-
-### System
-
-| Check | Description |
-|-------|-------------|
-| Kernel Version | Check for known vulnerabilities |
-| Updates | Pending security updates |
-| Running Processes | Suspicious process detection |
-| Cron Jobs | Audit scheduled tasks |
-
----
-
-## 📊 Reports
-
-### Report Types
-
-```bash
-# Text report
-sudo ./security-monitor.sh --report-format text
-
-# JSON report (for automation)
-sudo ./security-monitor.sh --report-format json
-
-# HTML report
-sudo ./security-monitor.sh --report-format html
-```
-
-### Sample Report Output
-
-```
-═══════════════════════════════════════════════════════
-             SECURITY AUDIT REPORT
-═══════════════════════════════════════════════════════
-Generated: 2024-01-12 10:30:00
-Hostname:  production-server-01
-═══════════════════════════════════════════════════════
-
-[CRITICAL] 2 issues found
-[HIGH]     5 issues found
-[MEDIUM]   12 issues found
-[LOW]      8 issues found
-
-─────────────────────────────────────────────────────
-CRITICAL FINDINGS:
-─────────────────────────────────────────────────────
-❌ Root SSH login is enabled
-❌ 3 accounts have empty passwords
-...
-```
+`uninstall` removes the cron jobs, installed scripts, shell shortcuts, data,
+and logs. **ClamAV packages stay installed**; remove them separately with
+`apt-get remove --purge 'clamav*'` or `dnf remove 'clamav*'`.
 
 ---
 
 ## ⏰ Automated Monitoring
 
-### Cron Setup
+`install` creates `/etc/cron.d/security-monitor` for you:
 
 ```bash
-# Edit crontab
-sudo crontab -e
+# Daily full scan at 2:00 AM
+0 2 * * * root /usr/local/bin/security-monitor scan full >/dev/null 2>&1
 
-# Daily security scan at 2 AM
-0 2 * * * /opt/linux-security-monitor/security-monitor.sh --full --email
-
-# Weekly full report
-0 3 * * 0 /opt/linux-security-monitor/security-monitor.sh --report /var/log/security/weekly-report.txt
+# Health check every 6 hours
+0 */6 * * * root /usr/local/bin/security-manager health >/dev/null 2>&1
 ```
+
+Adjust the schedule by editing that file — the commands above are the only
+ones you need.
 
 ---
 
 ## 🐛 Troubleshooting
 
-### Common Issues
-
 <details>
-<summary>❌ Permission Denied</summary>
+<summary>❌ Permission denied / "Root privileges required"</summary>
+
+All commands except `status` need root:
 
 ```bash
-# Run with sudo
-sudo ./security-monitor.sh
-
-# Or fix permissions
-chmod +x security-monitor.sh
+sudo ./security-manager.sh install
+sudo security-monitor scan
 ```
 </details>
 
 <details>
-<summary>❌ Command Not Found</summary>
+<summary>⚠ "Freshclam had issues (may be in cooldown)"</summary>
 
-Some checks require additional tools:
+ClamAV rate-limits definition downloads. The scan continues with the current
+database and freshclam retries automatically. Check progress with:
+
 ```bash
-# Debian/Ubuntu
-sudo apt install net-tools procps
-
-# RHEL/CentOS
-sudo yum install net-tools procps-ng
+sudo tail /var/log/clamav/freshclam.log
 ```
 </details>
 
 <details>
-<summary>❌ Report Not Generated</summary>
+<summary>❌ Dashboard says "No scan data available"</summary>
+
+The dashboard reads `/var/lib/security-monitor/status.json`, which is created
+by the first scan (and requires `jq`, installed by `install`):
 
 ```bash
-# Check log directory permissions
-sudo mkdir -p /var/log/security
-sudo chmod 755 /var/log/security
+sudo security-monitor scan
 ```
+</details>
+
+<details>
+<summary>❌ "Unsupported operating system"</summary>
+
+The installer only supports Ubuntu, Debian, and Amazon Linux (`dnf`). On other
+distributions the package and service names differ, so `install` refuses to run.
 </details>
 
 ---
 
 ## 🧪 Testing
 
-See [TEST-GUIDE.txt](TEST-GUIDE.txt) for testing instructions:
+There is no automated test suite. Before opening a PR, lint both scripts:
 
 ```bash
-# Run in test mode (no changes)
-./security-monitor.sh --dry-run
-
-# Verbose output
-./security-monitor.sh --verbose
+shellcheck security-monitor.sh security-manager.sh
+bash -n security-monitor.sh && bash -n security-manager.sh
 ```
 
 ---
