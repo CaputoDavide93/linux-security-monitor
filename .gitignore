@@ -25,6 +25,3 @@ Thumbs.db
 # Backup files
 *.bak
 *.backup
-
-# Test files
-test-*.sh
