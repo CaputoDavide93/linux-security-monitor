@@ -255,10 +255,11 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 **Davide Caputo**
 
 [![GitHub](https://img.shields.io/badge/GitHub-CaputoDavide93-181717?style=for-the-badge&logo=github)](https://github.com/CaputoDavide93)
-[![Email](https://img.shields.io/badge/Email-CaputoDav%40gmail.com-EA4335?style=for-the-badge&logo=gmail&logoColor=white)](mailto:CaputoDav@gmail.com)
 
 ---
 
 ⭐ **If this tool helped you, please give it a star!** ⭐
+
+<sub>Made with ❤️ by Davide Caputo</sub>
 
 </div>
