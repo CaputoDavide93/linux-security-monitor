@@ -4,10 +4,10 @@
 
 **ClamAV malware scanning, automatic security updates, and a terminal status dashboard for systemd Linux — built for EC2, tested on Ubuntu and Amazon Linux**
 
-![Shell](https://img.shields.io/badge/Shell-4EAA25?style=for-the-badge&logo=gnu-bash&logoColor=white)
-![Linux](https://img.shields.io/badge/Linux-FCC624?style=for-the-badge&logo=linux&logoColor=black)
-![ClamAV](https://img.shields.io/badge/ClamAV-FF0000?style=for-the-badge&logo=hackaday&logoColor=white)
-![License: MIT](https://img.shields.io/badge/License-MIT-yellow?style=for-the-badge)
+![Shell](https://img.shields.io/badge/Shell-4EAA25?logo=gnu-bash&logoColor=white)
+![Linux](https://img.shields.io/badge/Linux-FCC624?logo=linux&logoColor=black)
+![ClamAV](https://img.shields.io/badge/ClamAV-FF0000?logo=hackaday&logoColor=white)
+![License: MIT](https://img.shields.io/badge/License-MIT-yellow)
 
 [Features](#-features) • [Quick Start](#-quick-start) • [Usage](#-usage) • [Contributing](#-contributing)
 
@@ -254,12 +254,12 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 
 **Davide Caputo**
 
-[![GitHub](https://img.shields.io/badge/GitHub-CaputoDavide93-181717?style=for-the-badge&logo=github)](https://github.com/CaputoDavide93)
+[![GitHub](https://img.shields.io/badge/GitHub-CaputoDavide93-181717?logo=github)](https://github.com/CaputoDavide93)
 
 ---
 
 ⭐ **If this tool helped you, please give it a star!** ⭐
 
-<sub>Made with ❤️ by Davide Caputo</sub>
+<p align="center"><sub>Made with ❤️ by <a href="https://github.com/CaputoDavide93">Davide Caputo</a></sub></p>
 
 </div>
