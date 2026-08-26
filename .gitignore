@@ -1,12 +1,13 @@
 # Security Monitor .gitignore
 
-# Runtime data
-/var/lib/security-monitor/
-/var/log/security-monitor/
-
-# Status files
+# Runtime artefacts (these live under /var on an installed host, never in the repo,
+# but guard against a stray local test run writing them here)
 status.json
+scan-*.log
 *.log
+
+# Local config overrides — the committed security-monitor.conf is the default
+security-monitor.local.conf
 
 # Temporary files
 *.tmp
@@ -15,7 +16,6 @@ status.json
 
 # OS files
 .DS_Store
-Thumbs.db
 
 # IDE files
 .vscode/
