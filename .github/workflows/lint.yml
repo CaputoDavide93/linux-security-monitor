@@ -11,7 +11,7 @@ jobs:
     name: ShellCheck & syntax
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       - name: Install shellcheck
         run: |
@@ -34,7 +34,7 @@ jobs:
     name: Validate timer schedules
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       - name: Check OnCalendar expressions
         run: |
