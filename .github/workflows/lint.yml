@@ -1,0 +1,44 @@
+name: Lint
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  shellcheck:
+    name: ShellCheck & syntax
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install shellcheck
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq shellcheck
+
+      - name: Bash syntax check
+        run: |
+          for f in security-monitor.sh security-manager.sh; do
+            bash -n "$f"
+          done
+
+      - name: ShellCheck
+        run: shellcheck --severity=warning security-monitor.sh security-manager.sh
+
+      - name: Validate config is sourceable
+        run: bash -n security-monitor.conf && ( set -eu; . ./security-monitor.conf )
+
+  systemd-calendar:
+    name: Validate timer schedules
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Check OnCalendar expressions
+        run: |
+          set -eu
+          . ./security-monitor.conf
+          systemd-analyze calendar "$SCAN_SCHEDULE"
+          systemd-analyze calendar "$HEALTH_SCHEDULE"
